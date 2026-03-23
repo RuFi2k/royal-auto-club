@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npx prisma:*)",
+      "Bash(cmd /c \"npx prisma migrate dev --name add-encryption-and-audit-log\")",
+      "Bash(PRISMA_FORCE_NON_INTERACTIVE=true npx prisma migrate dev --name add-encryption-and-audit-log --skip-seed)",
+      "Bash(pg_dump --version)",
+      "Bash(cmd /c \"pg_dump --version\")",
+      "Bash(cmd /c \"where pg_dump\")",
+      "Bash(cmd /c \"dir \"\"C:\\\\Program Files\\\\PostgreSQL\"\" /b\")",
+      "Bash(npx tsc:*)",
+      "Bash(npx tsx:*)"
+    ]
+  }
+}

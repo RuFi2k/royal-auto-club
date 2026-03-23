@@ -1,0 +1,24 @@
+# Never commit secrets regardless of subdirectory .gitignore
+**/.env
+!**/.env.example
+
+# Nginx — certs and certbot webroot are runtime artefacts, not source
+nginx/certs/
+nginx/certbot-webroot/
+**/serviceAccount.json
+**/backups/
+**/*.pem
+**/*.key
+
+# Dependencies and build output
+**/node_modules/
+**/dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/

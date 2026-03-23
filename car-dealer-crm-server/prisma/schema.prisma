@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EngineType {
+  gasoline
+  diesel
+  electric
+  hybrid_gasoline
+  hybrid_diesel
+  gas
+  gasoline_gas
+}
+
+enum BodyType {
+  sedan
+  suv
+  crossover
+  hatchback
+  coupe
+  wagon
+  minivan
+  pickup
+  van
+  convertible
+  liftback
+}
+
+enum GearboxType {
+  manual
+  automatic
+  cvt
+  robot
+  dual_clutch
+}
+
+enum Drivetrain {
+  fwd
+  rwd
+  awd
+  four_wd
+}
+
+enum CabinType {
+  standard
+  extended
+  crew_cab
+  panoramic
+}
+
+enum CustomsStatus {
+  cleared
+  not_cleared
+  in_progress
+}
+
+enum SellType {
+  retail
+  wholesale
+  auction
+  consignment
+}
+
+enum CarOrigin {
+  EU
+  US
+  korea
+  japan
+  china
+  other
+}
+
+enum CarLocationStatus {
+  owner
+  dealership
+}
+
+model Car {
+  id                   Int               @id @default(autoincrement())
+
+  // Basic info
+  brand                String
+  model                String
+  year                 Int
+  mileage              Int               // km
+  color                String
+  vinNumber            String            // stored encrypted; uniqueness enforced via vinNumberHash
+  vinNumberHash        String?           @unique // HMAC of plaintext VIN
+  registrationNumber   String            // stored encrypted
+  countryOfRegistration String
+
+  // Engine & drivetrain
+  engineType           EngineType
+  engineVolume         Decimal           @db.Decimal(4, 1) // liters, e.g. 2.0
+  enginePower          Int               // horsepower
+  gearboxType          GearboxType
+  drivetrain           Drivetrain
+
+  // Body & interior
+  bodyType             BodyType
+  doorsCount           Int
+  seatsCount           Int
+  cabinType            CabinType
+
+  // Status & logistics
+  customsStatus        CustomsStatus
+  carOrigin            CarOrigin
+  carLocation          CarLocationStatus
+  location             String            // physical address / city
+
+  // Sales
+  sellType             SellType
+  isCryptoAvailable    Boolean           @default(false)
+  ownerPrice           Decimal           @db.Decimal(12, 2) // price the owner wants
+  websitePrice         Decimal           @db.Decimal(12, 2) // price shown on website
+  dealerPrice          Decimal           @db.Decimal(12, 2) // price for dealers
+  generalPrice         Decimal           @db.Decimal(12, 2) // base/internal price
+  isAvailable          Boolean           @default(true)
+
+  // Management
+  responsiblePerson    String            // user email or ID
+
+  // Files (Firebase Storage URLs)
+  photoUrl             String?
+  techPassportUrl      String?
+  defectsCheckUrl      String?
+  photoArchives        CarPhotoArchive[]
+
+  priceChangedAt       DateTime?         // set whenever any price field is updated
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  @@map("cars")
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  AVAILABILITY_CHANGE
+}
+
+model AuditLog {
+  id            Int         @id @default(autoincrement())
+  userId        String
+  action        AuditAction
+  carId         Int?        // kept after deletion so history is readable
+  changedFields Json?       // { field: { from, to } } for UPDATE; snapshot for CREATE/DELETE
+  timestamp     DateTime    @default(now())
+
+  @@map("audit_logs")
+  @@index([carId])
+  @@index([userId])
+  @@index([timestamp])
+}
+
+model CarPhotoArchive {
+  id        Int      @id @default(autoincrement())
+  carId     Int
+  car       Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+  url       String
+  filename  String
+  createdAt DateTime @default(now())
+
+  @@map("car_photo_archives")
+}

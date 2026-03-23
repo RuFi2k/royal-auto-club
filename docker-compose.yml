@@ -1,0 +1,50 @@
+services:
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: crm_app
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: car_dealer_crm
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm_app -d car_dealer_crm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+
+  server:
+    build: ./car-dealer-crm-server
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://crm_app:${DB_PASSWORD}@db:5432/car_dealer_crm?connection_limit=20&pool_timeout=15
+      PORT: 3000
+      NODE_ENV: production
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/serviceAccount.json
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+    volumes:
+      - ./backups:/app/backups
+      - ./serviceAccount.json:/run/secrets/serviceAccount.json:ro
+    restart: always
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/letsencrypt:ro
+      - ./nginx/certbot-webroot:/var/www/certbot:ro
+    depends_on:
+      - server
+    restart: always
+
+volumes:
+  pgdata:
