@@ -14,8 +14,7 @@ import "../cars.css";
 const PAGE_SIZE = 10;
 
 export function CarsPage() {
-  const auth = useAuth()!;
-  const { user, logout } = auth;
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const [cars, setCars] = useState<Car[]>([]);
