@@ -20,7 +20,7 @@ FROM node:20-alpine AS production
 WORKDIR /app
 
 # pg_dump is needed for the backup scheduler
-RUN apk add --no-cache postgresql-client
+RUN apk add --no-cache postgresql-client openssl
 
 # Only copy what's needed to run
 COPY --from=builder /app/dist          ./dist
