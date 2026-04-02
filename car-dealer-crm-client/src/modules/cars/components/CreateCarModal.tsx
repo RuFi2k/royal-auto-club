@@ -107,6 +107,17 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  function numProps(key: keyof FormData, extra?: React.InputHTMLAttributes<HTMLInputElement>) {
+    const value = form[key] as number;
+    return {
+      ...extra,
+      type: "number" as const,
+      value,
+      onFocus: (e: React.FocusEvent<HTMLInputElement>) => e.target.select(),
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => set(key, +e.target.value as FormData[typeof key]),
+    };
+  }
+
   function handleClose() {
     const dirty = Object.keys(getChangedFields(form, initialForm.current)).length > 0;
     if (dirty && !window.confirm("Є незбережені зміни. Закрити форму?")) return;
@@ -169,11 +180,11 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
               </div>
               <div className="form-field">
                 <label>Рік *</label>
-                <input required type="number" value={form.year} onChange={(e) => set("year", +e.target.value)} />
+                <input required {...numProps("year")} />
               </div>
               <div className="form-field">
                 <label>Пробіг (км) *</label>
-                <input required type="number" min={0} value={form.mileage} onChange={(e) => set("mileage", +e.target.value)} />
+                <input required {...numProps("mileage", { min: 0 })} />
               </div>
               <div className="form-field">
                 <label>Колір *</label>
@@ -211,11 +222,11 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
               </div>
               <div className="form-field">
                 <label>Об'єм двигуна (л)</label>
-                <input type="number" step="0.1" min={0} value={form.engineVolume} onChange={(e) => set("engineVolume", +e.target.value)} />
+                <input {...numProps("engineVolume", { step: 0.1, min: 0 })} />
               </div>
               <div className="form-field">
                 <label>Потужність (к.с.)</label>
-                <input type="number" min={0} value={form.enginePower} onChange={(e) => set("enginePower", +e.target.value)} />
+                <input {...numProps("enginePower", { min: 0 })} />
               </div>
               <div className="form-field">
                 <label>КПП</label>
@@ -260,11 +271,11 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
               </div>
               <div className="form-field">
                 <label>Дверей</label>
-                <input type="number" min={1} max={6} value={form.doorsCount} onChange={(e) => set("doorsCount", +e.target.value)} />
+                <input {...numProps("doorsCount", { min: 1, max: 6 })} />
               </div>
               <div className="form-field">
                 <label>Місць</label>
-                <input type="number" min={1} max={12} value={form.seatsCount} onChange={(e) => set("seatsCount", +e.target.value)} />
+                <input {...numProps("seatsCount", { min: 1, max: 12 })} />
               </div>
               <div className="form-field">
                 <label>Тип кабіни</label>
@@ -328,19 +339,19 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
               </div>
               <div className="form-field">
                 <label>Ціна власника ($)</label>
-                <input type="number" min={0} value={form.ownerPrice} onChange={(e) => set("ownerPrice", +e.target.value)} />
+                <input {...numProps("ownerPrice", { min: 0 })} />
               </div>
               <div className="form-field">
                 <label>Ціна на сайті ($)</label>
-                <input type="number" min={0} value={form.websitePrice} onChange={(e) => set("websitePrice", +e.target.value)} />
+                <input {...numProps("websitePrice", { min: 0 })} />
               </div>
               <div className="form-field">
                 <label>Ціна для дилерів ($)</label>
-                <input type="number" min={0} value={form.dealerPrice} onChange={(e) => set("dealerPrice", +e.target.value)} />
+                <input {...numProps("dealerPrice", { min: 0 })} />
               </div>
               <div className="form-field">
                 <label>Загальна ціна ($)</label>
-                <input type="number" min={0} value={form.generalPrice} onChange={(e) => set("generalPrice", +e.target.value)} />
+                <input {...numProps("generalPrice", { min: 0 })} />
               </div>
               <div className="form-field form-field-checkbox">
                 <label>
