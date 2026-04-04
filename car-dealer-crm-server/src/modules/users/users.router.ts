@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { requireFirebaseAuth, requireAuth, isAdminEmail, AuthRequest } from "../../middleware/auth.middleware";
+import { requireFirebaseAuth, requireAuth, isAdminEmail, evictFromCache, AuthRequest } from "../../middleware/auth.middleware";
 import { UsersService } from "./users.service";
 
 export const usersRouter = Router();
@@ -64,6 +64,7 @@ usersRouter.patch("/:uid/disable", requireAdmin, async (req: Request, res: Respo
     return;
   }
   const user = await UsersService.disable(targetUid);
+  evictFromCache(targetUid);
   res.json(user);
 });
 

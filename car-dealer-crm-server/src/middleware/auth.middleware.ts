@@ -23,6 +23,12 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000).unref();
 
+export function evictFromCache(uid: string) {
+  for (const [token, cached] of tokenCache) {
+    if (cached.uid === uid) tokenCache.delete(token);
+  }
+}
+
 const ADMIN_EMAILS = new Set(
   (process.env.ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean)
 );
