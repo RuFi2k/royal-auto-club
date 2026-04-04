@@ -108,7 +108,9 @@ export function CarsPage() {
         </div>
         <nav className="header-nav">
           <button className="nav-tab nav-tab-active">Список</button>
-          <button className="nav-tab" onClick={() => navigate("/dashboard")}>Дашборд</button>
+          {userStatus?.isAdmin && (
+            <button className="nav-tab" onClick={() => navigate("/dashboard")}>Дашборд</button>
+          )}
         </nav>
         <div className="cars-header-user">
           {userStatus?.isAdmin && (

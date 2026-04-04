@@ -5,6 +5,7 @@ import {
   PieChart, Pie, Cell, Legend,
 } from "recharts";
 import { useAuth } from "../../auth/AuthProvider";
+import { useUserStatus } from "../../users/hooks/useUserStatus";
 import { fetchStats } from "../services/stats.api";
 import type { DashboardStats } from "../types/stats.types";
 import "../dashboard.css";
@@ -32,6 +33,7 @@ function StatCard({ label, value, accent }: { label: string; value: number; acce
 
 export function DashboardPage() {
   const { user, logout } = useAuth();
+  const userStatus = useUserStatus();
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,6 +49,11 @@ export function DashboardPage() {
   }
 
   useEffect(() => {
+    if (userStatus && !userStatus.isAdmin) {
+      navigate("/listings", { replace: true });
+      return;
+    }
+    if (!userStatus) return;
     loadStats();
 
     function onVisible() {
@@ -54,7 +61,7 @@ export function DashboardPage() {
     }
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, []);
+  }, [userStatus]);
 
   const soldByMonthMap = stats
     ? new Map(stats.soldByMonth.map((s) => [s.month.slice(0, 7), s.count]))
