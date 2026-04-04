@@ -135,7 +135,9 @@ export function UsersPanel({ onClose }: Props) {
                     {user.disabled && <span style={{ color: "#e53e3e", fontSize: 12 }}>Заблоковано</span>}
                   </div>
                   <div className="pending-user-actions">
-                    {user.disabled ? (
+                    {user.isAdmin ? (
+                      <span style={{ fontSize: 12, color: "#718096" }}>Адмін</span>
+                    ) : user.disabled ? (
                       <button
                         className="action-btn action-available"
                         disabled={busy === user.uid}

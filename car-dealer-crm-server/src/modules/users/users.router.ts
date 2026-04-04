@@ -42,7 +42,7 @@ usersRouter.get("/pending", requireAdmin, async (_req: Request, res: Response) =
 // GET /users/approved — admin only
 usersRouter.get("/approved", requireAdmin, async (_req: Request, res: Response) => {
   const users = await UsersService.getApproved();
-  res.json(users);
+  res.json(users.map((u) => ({ ...u, isAdmin: isAdminEmail(u.email) })));
 });
 
 // PATCH /users/:uid/approve — admin only
@@ -53,7 +53,17 @@ usersRouter.patch("/:uid/approve", requireAdmin, async (req: Request, res: Respo
 
 // PATCH /users/:uid/disable — admin only
 usersRouter.patch("/:uid/disable", requireAdmin, async (req: Request, res: Response) => {
-  const user = await UsersService.disable(req.params.uid as string);
+  const targetUid = req.params.uid as string;
+  if (targetUid === uid(req)) {
+    res.status(400).json({ message: "Cannot disable yourself" });
+    return;
+  }
+  const target = await UsersService.findByUid(targetUid);
+  if (target && isAdminEmail(target.email)) {
+    res.status(400).json({ message: "Cannot disable another admin" });
+    return;
+  }
+  const user = await UsersService.disable(targetUid);
   res.json(user);
 });
 

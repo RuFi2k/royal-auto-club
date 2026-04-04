@@ -9,6 +9,10 @@ export const UsersService = {
     });
   },
 
+  async findByUid(uid: string) {
+    return prisma.appUser.findUnique({ where: { uid } });
+  },
+
   async isApproved(uid: string): Promise<boolean> {
     const user = await prisma.appUser.findUnique({ where: { uid } });
     if (!user?.approved || user?.disabled) return false;

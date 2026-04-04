@@ -19,6 +19,7 @@ export interface ApprovedUser {
   email: string;
   name: string | null;
   disabled: boolean;
+  isAdmin: boolean;
   createdAt: string;
 }
 
