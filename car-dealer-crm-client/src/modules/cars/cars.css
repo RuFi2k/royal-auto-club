@@ -75,6 +75,23 @@
   color: #a0aec0;
 }
 
+.btn-users {
+  padding: 6px 14px;
+  background: transparent;
+  color: #a0aec0;
+  border: 1px solid #4a5568;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+
+.btn-users:hover {
+  background: #2d3748;
+  color: #fff;
+}
+
 .btn-new-listing {
   padding: 6px 14px;
   background: #4a90d9;
@@ -537,6 +554,49 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+/* ── Pending users panel ──────────────────────────────────── */
+.pending-user-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.pending-user-row:last-child {
+  border-bottom: none;
+}
+
+.pending-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pending-user-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a2e;
+}
+
+.pending-user-email {
+  font-size: 13px;
+  color: #4a5568;
+}
+
+.pending-user-date {
+  font-size: 11px;
+  color: #a0aec0;
+}
+
+.pending-user-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 /* ── Badges ───────────────────────────────────────────────── */

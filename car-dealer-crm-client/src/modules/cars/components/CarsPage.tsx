@@ -8,6 +8,8 @@ import { Pagination } from "./Pagination";
 import { CreateCarModal } from "./CreateCarModal";
 import { CarDetailModal } from "./CarDetailModal";
 import { PhotoArchivesModal } from "./PhotoArchivesModal";
+import { UsersPanel } from "../../users/components/UsersPanel";
+import { useUserStatus } from "../../users/hooks/useUserStatus";
 import type { Car, CarFilters } from "../types/car.types";
 import "../cars.css";
 
@@ -15,6 +17,7 @@ const PAGE_SIZE = 10;
 
 export function CarsPage() {
   const { user, logout } = useAuth();
+  const userStatus = useUserStatus();
   const navigate = useNavigate();
 
   const [cars, setCars] = useState<Car[]>([]);
@@ -26,6 +29,7 @@ export function CarsPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const [showCreate, setShowCreate] = useState(false);
+  const [showUsers, setShowUsers] = useState(false);
   const [viewingCar, setViewingCar] = useState<Car | null>(null);
   const [editingCar, setEditingCar] = useState<Car | null>(null);
   const [archiveCar, setArchiveCar] = useState<Car | null>(null);
@@ -107,6 +111,9 @@ export function CarsPage() {
           <button className="nav-tab" onClick={() => navigate("/dashboard")}>Дашборд</button>
         </nav>
         <div className="cars-header-user">
+          {userStatus?.isAdmin && (
+            <button className="btn-users" onClick={() => setShowUsers(true)}>Користувачі</button>
+          )}
           <button className="btn-new-listing" onClick={() => setShowCreate(true)}>+ Нове оголошення</button>
           <span>{user?.email}</span>
           <button className="btn-logout" onClick={logout}>Вийти</button>
@@ -141,6 +148,8 @@ export function CarsPage() {
           onSaved={handleSaved}
         />
       )}
+
+      {showUsers && <UsersPanel onClose={() => setShowUsers(false)} />}
 
       {viewingCar && (
         <CarDetailModal

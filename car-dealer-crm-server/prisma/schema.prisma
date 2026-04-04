@@ -160,6 +160,16 @@ model AuditLog {
   @@index([timestamp])
 }
 
+model AppUser {
+  uid       String   @id
+  email     String   @unique
+  name      String?
+  approved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("app_users")
+}
+
 model CarPhotoArchive {
   id        Int      @id @default(autoincrement())
   carId     Int

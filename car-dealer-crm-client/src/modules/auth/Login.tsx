@@ -3,21 +3,55 @@ import { useAuth } from "./AuthProvider";
 import { useState } from "react";
 import "./login.css";
 
+type Mode = "login" | "register";
+
 export function Login() {
+  const [mode, setMode] = useState<Mode>("login");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const { login, loginWithGoogle } = useAuth();
+  const [submitting, setSubmitting] = useState(false);
+  const { login, loginWithGoogle, register } = useAuth();
   const navigate = useNavigate();
+
+  function switchMode(next: Mode) {
+    setMode(next);
+    setError(null);
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSubmitting(true);
     try {
       await login(email, password);
       navigate("/listings");
-    } catch (err: any) {
+    } catch {
       setError("Невірний email або пароль.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await register(email, password, name);
+      // After registration user is logged in but pending — ProtectedRoute will show pending screen
+      navigate("/listings");
+    } catch (err: any) {
+      if (err.code === "auth/email-already-in-use") {
+        setError("Цей email вже зареєстровано.");
+      } else if (err.code === "auth/weak-password") {
+        setError("Пароль повинен містити не менше 6 символів.");
+      } else {
+        setError("Помилка реєстрації. Спробуйте ще раз.");
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -41,39 +75,64 @@ export function Login() {
 
       <div className="login-body">
         <div className="login-card">
-          <h2>Вхід до облікового запису</h2>
-
-          <form onSubmit={handleLogin}>
-            <div className="login-field">
-              <label>Електронна пошта</label>
-              <input
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="login-field">
-              <label>Пароль</label>
-              <input
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-            </div>
-
-            {error && (
-              <p style={{ fontSize: 13, color: "#c53030", marginTop: 8 }}>{error}</p>
-            )}
-
-            <button type="submit" className="btn-primary">
-              Увійти
+          <div className="login-tabs">
+            <button
+              className={`login-tab ${mode === "login" ? "login-tab-active" : ""}`}
+              onClick={() => switchMode("login")}
+            >
+              Вхід
             </button>
-          </form>
+            <button
+              className={`login-tab ${mode === "register" ? "login-tab-active" : ""}`}
+              onClick={() => switchMode("register")}
+            >
+              Реєстрація
+            </button>
+          </div>
+
+          {mode === "login" ? (
+            <form onSubmit={handleLogin}>
+              <div className="login-field">
+                <label>Електронна пошта</label>
+                <input type="email" placeholder="you@example.com" value={email}
+                  onChange={(e) => setEmail(e.target.value)} required />
+              </div>
+              <div className="login-field">
+                <label>Пароль</label>
+                <input type="password" placeholder="••••••••" value={password}
+                  onChange={(e) => setPassword(e.target.value)} required />
+              </div>
+              {error && <p className="login-error">{error}</p>}
+              <button type="submit" className="btn-primary" disabled={submitting}>
+                {submitting ? "Вхід..." : "Увійти"}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleRegister}>
+              <div className="login-field">
+                <label>Ім'я</label>
+                <input type="text" placeholder="Ваше ім'я" value={name}
+                  onChange={(e) => setName(e.target.value)} required />
+              </div>
+              <div className="login-field">
+                <label>Електронна пошта</label>
+                <input type="email" placeholder="you@example.com" value={email}
+                  onChange={(e) => setEmail(e.target.value)} required />
+              </div>
+              <div className="login-field">
+                <label>Пароль</label>
+                <input type="password" placeholder="Мінімум 6 символів" value={password}
+                  onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+              </div>
+              {error && <p className="login-error">{error}</p>}
+              <button type="submit" className="btn-primary" disabled={submitting}>
+                {submitting ? "Реєстрація..." : "Зареєструватись"}
+              </button>
+              <p className="login-hint">
+                Після реєстрації ваш акаунт буде активовано адміністратором.
+              </p>
+            </form>
+          )}
 
           <div className="login-divider">або</div>
 
@@ -84,7 +143,7 @@ export function Login() {
               <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
               <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
             </svg>
-            Увійти через Google
+            {mode === "login" ? "Увійти через Google" : "Зареєструватись через Google"}
           </button>
         </div>
       </div>
