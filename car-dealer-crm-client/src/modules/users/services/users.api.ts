@@ -1,4 +1,4 @@
-import { authHeaders, authHeadersNoContentType } from "../../cars/services/api.helpers";
+import { authHeadersNoContentType } from "../../cars/services/api.helpers";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
