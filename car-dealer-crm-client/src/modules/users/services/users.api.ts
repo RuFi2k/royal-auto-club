@@ -14,6 +14,14 @@ export interface PendingUser {
   createdAt: string;
 }
 
+export interface ApprovedUser {
+  uid: string;
+  email: string;
+  name: string | null;
+  disabled: boolean;
+  createdAt: string;
+}
+
 export async function fetchUserStatus(): Promise<UserStatus> {
   const res = await fetch(`${API_URL}/users/status`, {
     headers: await authHeadersNoContentType(),
@@ -44,4 +52,28 @@ export async function rejectUser(uid: string): Promise<void> {
     headers: await authHeadersNoContentType(),
   });
   if (!res.ok) throw new Error("Failed to reject user");
+}
+
+export async function fetchApprovedUsers(): Promise<ApprovedUser[]> {
+  const res = await fetch(`${API_URL}/users/approved`, {
+    headers: await authHeadersNoContentType(),
+  });
+  if (!res.ok) throw new Error("Failed to fetch approved users");
+  return res.json();
+}
+
+export async function disableUser(uid: string): Promise<void> {
+  const res = await fetch(`${API_URL}/users/${uid}/disable`, {
+    method: "PATCH",
+    headers: await authHeadersNoContentType(),
+  });
+  if (!res.ok) throw new Error("Failed to disable user");
+}
+
+export async function enableUser(uid: string): Promise<void> {
+  const res = await fetch(`${API_URL}/users/${uid}/enable`, {
+    method: "PATCH",
+    headers: await authHeadersNoContentType(),
+  });
+  if (!res.ok) throw new Error("Failed to enable user");
 }
