@@ -5,6 +5,7 @@ const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 export interface UserStatus {
   approved: boolean;
   isAdmin: boolean;
+  disabled: boolean;
 }
 
 export interface PendingUser {

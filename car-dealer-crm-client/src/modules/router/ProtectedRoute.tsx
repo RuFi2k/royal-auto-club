@@ -13,7 +13,7 @@ const ProtectedRoute = ({ children }: PropsWithChildren) => {
     if (!user) { setLoading(false); return; }
     fetchUserStatus()
       .then(setStatus)
-      .catch(() => setStatus({ approved: false, isAdmin: false }))
+      .catch(() => setStatus({ approved: false, isAdmin: false, disabled: false }))
       .finally(() => setLoading(false));
   }, [user]);
 
@@ -25,6 +25,21 @@ const ProtectedRoute = ({ children }: PropsWithChildren) => {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "sans-serif", color: "#718096" }}>
         Завантаження...
+      </div>
+    );
+  }
+
+  if (status?.disabled) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh", gap: 16, fontFamily: "sans-serif", color: "#1a1a2e", textAlign: "center", padding: "0 24px" }}>
+        <div style={{ fontSize: 48 }}>🚫</div>
+        <h2 style={{ margin: 0 }}>Акаунт заблоковано</h2>
+        <p style={{ margin: 0, color: "#718096", maxWidth: 360 }}>
+          Доступ для акаунту <strong>{user.email}</strong> було заблоковано адміністратором.
+        </p>
+        <button onClick={logout} style={{ marginTop: 8, padding: "8px 20px", background: "#1a1a2e", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 13 }}>
+          Вийти
+        </button>
       </div>
     );
   }
