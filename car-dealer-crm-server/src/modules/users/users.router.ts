@@ -39,9 +39,27 @@ usersRouter.get("/pending", requireAdmin, async (_req: Request, res: Response) =
   res.json(users);
 });
 
+// GET /users/approved — admin only
+usersRouter.get("/approved", requireAdmin, async (_req: Request, res: Response) => {
+  const users = await UsersService.getApproved();
+  res.json(users);
+});
+
 // PATCH /users/:uid/approve — admin only
 usersRouter.patch("/:uid/approve", requireAdmin, async (req: Request, res: Response) => {
   const user = await UsersService.approve(req.params.uid as string);
+  res.json(user);
+});
+
+// PATCH /users/:uid/disable — admin only
+usersRouter.patch("/:uid/disable", requireAdmin, async (req: Request, res: Response) => {
+  const user = await UsersService.disable(req.params.uid as string);
+  res.json(user);
+});
+
+// PATCH /users/:uid/enable — admin only
+usersRouter.patch("/:uid/enable", requireAdmin, async (req: Request, res: Response) => {
+  const user = await UsersService.enable(req.params.uid as string);
   res.json(user);
 });
 

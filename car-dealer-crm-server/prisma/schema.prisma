@@ -165,6 +165,7 @@ model AppUser {
   email     String   @unique
   name      String?
   approved  Boolean  @default(false)
+  disabled  Boolean  @default(false)
   createdAt DateTime @default(now())
 
   @@map("app_users")

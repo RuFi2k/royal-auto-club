@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { admin } from "../lib/firebase-admin";
-import { UsersService } from "../modules/users/users.service";
+import { prisma } from "../db";
 
 export interface AuthRequest extends Request {
   uid: string;
@@ -85,8 +85,12 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     const email = (decoded.email ?? "").toLowerCase();
 
     if (!isAdminEmail(email)) {
-      const approved = await UsersService.isApproved(decoded.uid);
-      if (!approved) {
+      const user = await prisma.appUser.findUnique({ where: { uid: decoded.uid } });
+      if (user?.disabled) {
+        res.status(403).json({ message: "account_disabled" });
+        return;
+      }
+      if (!user?.approved) {
         res.status(403).json({ message: "pending_approval" });
         return;
       }
