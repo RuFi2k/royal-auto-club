@@ -33,7 +33,7 @@ export function UsersPanel({ onClose }: Props) {
       await approveUser(uid);
       const user = pending.find((u) => u.uid === uid);
       setPending((prev) => prev.filter((u) => u.uid !== uid));
-      if (user) setApproved((prev) => [...prev, { ...user, disabled: false }]);
+      if (user) setApproved((prev) => [...prev, { ...user, disabled: false, isAdmin: false }]);
     } catch (e: any) {
       setError(e.message);
     } finally {
