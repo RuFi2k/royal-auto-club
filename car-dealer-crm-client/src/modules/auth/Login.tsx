@@ -1,5 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthProvider";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "./firebase";
 import { useState } from "react";
 import "./login.css";
 
@@ -11,6 +13,7 @@ export function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [resetSent, setResetSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const { login, register } = useAuth();
   const navigate = useNavigate();
@@ -18,6 +21,24 @@ export function Login() {
   function switchMode(next: Mode) {
     setMode(next);
     setError(null);
+    setResetSent(false);
+  }
+
+  async function handleForgotPassword() {
+    if (!email) {
+      setError("Введіть email, щоб отримати лист для скидання пароля.");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setResetSent(true);
+    } catch {
+      setError("Не вдалося надіслати лист. Перевірте email.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -92,9 +113,15 @@ export function Login() {
                   onChange={(e) => setPassword(e.target.value)} required />
               </div>
               {error && <p className="login-error">{error}</p>}
+              {resetSent && <p className="login-hint" style={{ color: "#48bb78" }}>Лист для скидання пароля надіслано.</p>}
               <button type="submit" className="btn-primary" disabled={submitting}>
                 {submitting ? "Вхід..." : "Увійти"}
               </button>
+              <p className="login-hint" style={{ textAlign: "right", marginTop: 8 }}>
+                <button type="button" className="login-link" disabled={submitting} onClick={handleForgotPassword}>
+                  Забули пароль?
+                </button>
+              </p>
             </form>
           ) : (
             <form onSubmit={handleRegister}>
