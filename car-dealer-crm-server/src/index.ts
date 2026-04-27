@@ -5,6 +5,7 @@ import cron from "node-cron";
 import { carsRouter } from "./modules/cars/cars.router";
 import { statsRouter } from "./modules/stats/stats.router";
 import { usersRouter } from "./modules/users/users.router";
+import { publicRouter } from "./modules/public/public.router";
 import { prisma } from "./db";
 import { runBackup } from "./lib/backup";
 
@@ -25,6 +26,7 @@ app.use(
   })
 );
 
+app.use("/public", publicRouter);
 app.use("/cars", carsRouter);
 app.use("/stats", statsRouter);
 app.use("/users", usersRouter);

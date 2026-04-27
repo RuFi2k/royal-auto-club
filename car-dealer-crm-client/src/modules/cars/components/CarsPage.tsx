@@ -8,6 +8,7 @@ import { Pagination } from "./Pagination";
 import { CreateCarModal } from "./CreateCarModal";
 import { CarDetailModal } from "./CarDetailModal";
 import { PhotoArchivesModal } from "./PhotoArchivesModal";
+import { PhotoGalleryModal } from "./PhotoGalleryModal";
 import { UsersPanel } from "../../users/components/UsersPanel";
 import { useUserStatus } from "../../users/hooks/useUserStatus";
 import type { Car, CarFilters } from "../types/car.types";
@@ -33,6 +34,7 @@ export function CarsPage() {
   const [viewingCar, setViewingCar] = useState<Car | null>(null);
   const [editingCar, setEditingCar] = useState<Car | null>(null);
   const [archiveCar, setArchiveCar] = useState<Car | null>(null);
+  const [galleryCar, setGalleryCar] = useState<Car | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -134,6 +136,7 @@ export function CarsPage() {
         onToggleAvailability={handleToggleAvailability}
         onDelete={handleDelete}
         onManageArchives={setArchiveCar}
+        onManagePhotos={setGalleryCar}
       />
 
       <Pagination
@@ -163,6 +166,10 @@ export function CarsPage() {
 
       {archiveCar && (
         <PhotoArchivesModal car={archiveCar} onClose={() => setArchiveCar(null)} />
+      )}
+
+      {galleryCar && (
+        <PhotoGalleryModal car={galleryCar} onClose={() => setGalleryCar(null)} />
       )}
     </div>
   );

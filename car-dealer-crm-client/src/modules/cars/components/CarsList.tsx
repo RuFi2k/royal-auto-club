@@ -8,6 +8,7 @@ interface Props {
   onToggleAvailability: (car: Car) => void;
   onDelete: (car: Car) => void;
   onManageArchives: (car: Car) => void;
+  onManagePhotos: (car: Car) => void;
 }
 
 function fmt(value: number) {
@@ -79,7 +80,7 @@ function NoPhotoIcon() {
   );
 }
 
-export function CarsList({ cars, loading, onView, onEdit, onToggleAvailability, onDelete, onManageArchives }: Props) {
+export function CarsList({ cars, loading, onView, onEdit, onToggleAvailability, onDelete, onManageArchives, onManagePhotos }: Props) {
   if (loading) return <div className="cars-state">Завантаження...</div>;
   if (!cars.length) return <div className="cars-state">Автомобілів не знайдено.</div>;
 
@@ -115,6 +116,9 @@ export function CarsList({ cars, loading, onView, onEdit, onToggleAvailability, 
                 </button>
                 <button className="action-btn action-edit" onClick={() => onEdit(car)}>
                   Редагувати
+                </button>
+                <button className="action-btn action-edit" onClick={() => onManagePhotos(car)}>
+                  Галерея
                 </button>
                 <button className="action-btn action-archive" onClick={() => onManageArchives(car)}>
                   Архіви фото

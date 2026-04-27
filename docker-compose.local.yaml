@@ -1,0 +1,86 @@
+services:
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: crm_app
+      POSTGRES_PASSWORD: devpass
+      POSTGRES_DB: car_dealer_crm
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata-local:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crm_app -d car_dealer_crm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  firebase:
+    build: ./firebase-emulator
+    environment:
+      FIREBASE_PROJECT: demo-crm
+      SEED_ADMIN_EMAIL: admin@royalautoclub.local
+      SEED_ADMIN_PASSWORD: admin123
+    ports:
+      - "9099:9099"   # Auth
+      - "9199:9199"   # Storage
+      - "4100:4000"   # Emulator UI
+
+  server:
+    build:
+      context: ./car-dealer-crm-server
+      dockerfile: Dockerfile.dev
+    depends_on:
+      db:
+        condition: service_healthy
+      firebase:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql://crm_app:devpass@db:5432/car_dealer_crm
+      PORT: "3000"
+      CORS_ORIGIN: http://localhost:5173
+      FIREBASE_PROJECT_ID: demo-crm
+      FIREBASE_AUTH_EMULATOR_HOST: firebase:9099
+      ENCRYPTION_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      ADMIN_EMAILS: admin@royalautoclub.local
+      PUBLIC_API_KEYS: dev-site-key-please-rotate
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./car-dealer-crm-server/src:/app/src
+      - ./car-dealer-crm-server/prisma:/app/prisma
+      - ./car-dealer-crm-server/tsconfig.json:/app/tsconfig.json
+      - ./car-dealer-crm-server/package.json:/app/package.json
+      - ./car-dealer-crm-server/package-lock.json:/app/package-lock.json
+
+  client:
+    build:
+      context: ./car-dealer-crm-client
+      dockerfile: Dockerfile.dev
+    depends_on:
+      - server
+    environment:
+      VITE_API_URL: http://localhost:3001
+      VITE_FIREBASE_USE_EMULATOR: "1"
+      VITE_FIREBASE_PROJECT_ID: demo-crm
+      VITE_FIREBASE_STORAGE_BUCKET: demo-crm.appspot.com
+      VITE_FIREBASE_API_KEY: fake
+      VITE_FIREBASE_AUTH_DOMAIN: localhost
+      VITE_FIREBASE_MESSAGING_SENDER_ID: "000000000000"
+      VITE_FIREBASE_APP_ID: "1:000000000000:web:fake"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./car-dealer-crm-client/src:/app/src
+      - ./car-dealer-crm-client/public:/app/public
+      - ./car-dealer-crm-client/index.html:/app/index.html
+      - ./car-dealer-crm-client/vite.config.ts:/app/vite.config.ts
+      - ./car-dealer-crm-client/tsconfig.json:/app/tsconfig.json
+      - ./car-dealer-crm-client/tsconfig.app.json:/app/tsconfig.app.json
+      - ./car-dealer-crm-client/tsconfig.node.json:/app/tsconfig.node.json
+      - ./car-dealer-crm-client/package.json:/app/package.json
+      - ./car-dealer-crm-client/package-lock.json:/app/package-lock.json
+
+volumes:
+  pgdata-local:

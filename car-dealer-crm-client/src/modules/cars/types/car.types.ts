@@ -58,6 +58,15 @@ export interface CarPhotoArchive {
   createdAt: string;
 }
 
+export interface CarPhoto {
+  id: number;
+  carId: number;
+  url: string;
+  alt: string | null;
+  sortOrder: number;
+  createdAt: string;
+}
+
 export interface CarsPage {
   data: Car[];
   total: number;

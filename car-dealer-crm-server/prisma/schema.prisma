@@ -127,9 +127,10 @@ model Car {
   responsiblePerson    String            // user email or ID
 
   // Files (Firebase Storage URLs)
-  photoUrl             String?
+  photoUrl             String?           // legacy denormalized cover; prefer photos[] for gallery
   techPassportUrl      String?
   defectsCheckUrl      String?
+  photos               CarPhoto[]
   photoArchives        CarPhotoArchive[]
 
   priceChangedAt       DateTime?         // set whenever any price field is updated
@@ -169,6 +170,19 @@ model AppUser {
   createdAt DateTime @default(now())
 
   @@map("app_users")
+}
+
+model CarPhoto {
+  id        Int      @id @default(autoincrement())
+  carId     Int
+  car       Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+  url       String
+  alt       String?
+  sortOrder Int      @default(0) // lowest = cover
+  createdAt DateTime @default(now())
+
+  @@map("car_photos")
+  @@index([carId, sortOrder])
 }
 
 model CarPhotoArchive {

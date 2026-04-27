@@ -2,6 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { createCar, updateCar } from "../services/cars.api";
 import { uploadCarFile } from "../services/storage";
 import type { Car } from "../types/car.types";
+import { PhotoGalleryModal } from "./PhotoGalleryModal";
+
+type StagedPhoto = {
+  key: string;       // local stable id
+  file: File;
+  previewUrl: string;
+  alt: string;
+};
 
 const DRAFT_KEY = "car-form-draft";
 
@@ -90,11 +98,17 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
   }
 
   const [form, setForm] = useState<FormData>(loadInitial);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [techPassportFile, setTechPassportFile] = useState<File | null>(null);
   const [defectsCheckFile, setDefectsCheckFile] = useState<File | null>(null);
+  const [stagedPhotos, setStagedPhotos] = useState<StagedPhoto[]>([]);
+  const [showGalleryModal, setShowGalleryModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Revoke object URLs when staged photos are removed/unmounted
+  useEffect(() => () => {
+    stagedPhotos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist draft to sessionStorage on every change (CREATE mode only)
   useEffect(() => {
@@ -131,7 +145,6 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
     setError(null);
     try {
       const fileUploads: Partial<FormData> = {};
-      if (photoFile) fileUploads.photoUrl = await uploadCarFile(photoFile, "photos");
       if (techPassportFile) fileUploads.techPassportUrl = await uploadCarFile(techPassportFile, "tech-passports");
       if (defectsCheckFile) fileUploads.defectsCheckUrl = await uploadCarFile(defectsCheckFile, "defects-checks");
 
@@ -146,7 +159,15 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
         }
         saved = await updateCar(car.id, changes);
       } else {
-        saved = await createCar(formWithFiles);
+        // CREATE mode — upload staged gallery photos, then POST with photos[]
+        const uploadedPhotos: Array<{ url: string; alt: string | null }> = [];
+        for (const p of stagedPhotos) {
+          const url = await uploadCarFile(p.file, "photos");
+          uploadedPhotos.push({ url, alt: p.alt || null });
+        }
+        const payload: any = { ...formWithFiles };
+        if (uploadedPhotos.length > 0) payload.photos = uploadedPhotos;
+        saved = await createCar(payload);
       }
       if (isCreate) sessionStorage.removeItem(DRAFT_KEY);
       onSaved(saved);
@@ -155,6 +176,41 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function addStagedPhotos(files: FileList | File[]) {
+    const arr = Array.from(files);
+    if (arr.length === 0) return;
+    const additions: StagedPhoto[] = arr.map((file) => ({
+      key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      file,
+      previewUrl: URL.createObjectURL(file),
+      alt: "",
+    }));
+    setStagedPhotos((prev) => [...prev, ...additions]);
+  }
+
+  function removeStagedPhoto(key: string) {
+    setStagedPhotos((prev) => {
+      const target = prev.find((p) => p.key === key);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((p) => p.key !== key);
+    });
+  }
+
+  function moveStagedPhoto(key: string, delta: number) {
+    setStagedPhotos((prev) => {
+      const idx = prev.findIndex((p) => p.key === key);
+      const target = idx + delta;
+      if (idx < 0 || target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[target]] = [next[target], next[idx]];
+      return next;
+    });
+  }
+
+  function setStagedAlt(key: string, alt: string) {
+    setStagedPhotos((prev) => prev.map((p) => (p.key === key ? { ...p, alt } : p)));
   }
 
   return (
@@ -379,18 +435,153 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
           </section>
 
           <section className="form-section">
-            <h3>Фото та документи</h3>
-            <div className="form-grid">
-
-              <div className="form-field">
-                <label>Фото автомобіля</label>
-                {form.photoUrl && !photoFile && (
-                  <img src={form.photoUrl} alt="Фото" className="upload-preview" />
+            <h3>Галерея</h3>
+            {isCreate ? (
+              <>
+                <div className="form-field">
+                  <label>Фото автомобіля (перше — обкладинка)</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="upload-input"
+                    onChange={(e) => {
+                      addStagedPhotos(e.target.files ?? []);
+                      e.target.value = "";
+                    }}
+                  />
+                </div>
+                {stagedPhotos.length > 0 && (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+                      gap: 10,
+                      marginTop: 10,
+                    }}
+                  >
+                    {stagedPhotos.map((p, idx) => (
+                      <div
+                        key={p.key}
+                        style={{
+                          border: "1px solid #2a2a3a",
+                          borderRadius: 10,
+                          overflow: "hidden",
+                          background: "#15151f",
+                          display: "flex",
+                          flexDirection: "column",
+                        }}
+                      >
+                        <div style={{ position: "relative", aspectRatio: "16/10", background: "#000" }}>
+                          <img
+                            src={p.previewUrl}
+                            alt={p.alt}
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          />
+                          {idx === 0 && (
+                            <span
+                              style={{
+                                position: "absolute",
+                                top: 6,
+                                left: 6,
+                                background: "#facc15",
+                                color: "#1a1a2e",
+                                padding: "2px 6px",
+                                borderRadius: 999,
+                                fontSize: 10,
+                                fontWeight: 700,
+                              }}
+                            >
+                              ОБКЛАДИНКА
+                            </span>
+                          )}
+                          <span
+                            style={{
+                              position: "absolute",
+                              top: 6,
+                              right: 6,
+                              background: "rgba(0,0,0,0.6)",
+                              color: "#fff",
+                              padding: "1px 5px",
+                              borderRadius: 6,
+                              fontSize: 10,
+                              fontVariantNumeric: "tabular-nums",
+                            }}
+                          >
+                            #{idx + 1}
+                          </span>
+                        </div>
+                        <div style={{ padding: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+                          <input
+                            type="text"
+                            placeholder="Опис"
+                            value={p.alt}
+                            onChange={(e) => setStagedAlt(p.key, e.target.value)}
+                            style={{
+                              width: "100%",
+                              background: "#0e0e16",
+                              border: "1px solid #2a2a3a",
+                              borderRadius: 6,
+                              color: "#fff",
+                              padding: "4px 6px",
+                              fontSize: 11,
+                            }}
+                          />
+                          <div style={{ display: "flex", gap: 4 }}>
+                            <button
+                              type="button"
+                              className="action-btn action-edit"
+                              onClick={() => moveStagedPhoto(p.key, -1)}
+                              disabled={idx === 0}
+                              title="Підняти вгору"
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              className="action-btn action-edit"
+                              onClick={() => moveStagedPhoto(p.key, 1)}
+                              disabled={idx === stagedPhotos.length - 1}
+                              title="Опустити вниз"
+                            >
+                              ↓
+                            </button>
+                            <button
+                              type="button"
+                              className="action-btn action-sold"
+                              onClick={() => removeStagedPhoto(p.key)}
+                              style={{ marginLeft: "auto" }}
+                            >
+                              Видалити
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
-                {photoFile && <span className="upload-filename">📷 {photoFile.name}</span>}
-                <input type="file" accept="image/*" className="upload-input"
-                  onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)} />
+              </>
+            ) : (
+              <div className="form-field">
+                <label>Фото галереї</label>
+                <button
+                  type="button"
+                  className="action-btn action-edit"
+                  onClick={() => setShowGalleryModal(true)}
+                  style={{ alignSelf: "flex-start" }}
+                >
+                  Відкрити редактор галереї →
+                </button>
+                <p style={{ fontSize: 12, color: "#888", marginTop: 6 }}>
+                  Управляйте обкладинкою, додавайте та видаляйте фото в окремому редакторі.
+                </p>
               </div>
+            )}
+          </section>
+
+          <section className="form-section">
+            <h3>Документи</h3>
+            <div className="form-grid">
 
               <div className="form-field">
                 <label>Техпаспорт</label>
@@ -437,6 +628,10 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
           </div>
 
         </form>
+
+        {showGalleryModal && car && (
+          <PhotoGalleryModal car={car} onClose={() => setShowGalleryModal(false)} />
+        )}
       </div>
     </div>
   );

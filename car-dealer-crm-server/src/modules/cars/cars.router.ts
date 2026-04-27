@@ -78,8 +78,32 @@ carsRouter.get("/:id", a(async (req, res) => {
 
 // POST /cars
 carsRouter.post("/", a(async (req, res) => {
-  const car = await CarsService.create(req.body, uid(req));
-  res.status(201).json(car);
+  const { photos, ...carInput } = (req.body ?? {}) as Record<string, unknown> & {
+    photos?: Array<{ url: string; alt?: string | null }>;
+  };
+
+  // Denormalize cover from gallery if explicit photoUrl wasn't provided.
+  if (Array.isArray(photos) && photos.length > 0 && !carInput.photoUrl) {
+    carInput.photoUrl = photos[0].url;
+  }
+
+  const car = await CarsService.create(carInput as Parameters<typeof CarsService.create>[0], uid(req));
+
+  if (Array.isArray(photos) && photos.length > 0) {
+    await prisma.$transaction(
+      photos.map((p, idx) =>
+        prisma.carPhoto.create({
+          data: { carId: car.id, url: p.url, alt: p.alt ?? null, sortOrder: idx },
+        })
+      )
+    );
+  }
+
+  const withPhotos = await prisma.car.findUnique({
+    where: { id: car.id },
+    include: { photos: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] } },
+  });
+  res.status(201).json(withPhotos ?? car);
 }));
 
 // PATCH /cars/:id
@@ -104,6 +128,75 @@ carsRouter.delete("/:id", a(async (req, res) => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) { res.status(400).json({ message: "Invalid id" }); return; }
   await CarsService.delete(id, uid(req));
+  res.status(204).send();
+}));
+
+// GET /cars/:id/photos — gallery, sorted by sortOrder asc
+carsRouter.get("/:id/photos", a(async (req, res) => {
+  const carId = parseInt(req.params.id as string, 10);
+  if (isNaN(carId)) { res.status(400).json({ message: "Invalid id" }); return; }
+  const photos = await prisma.carPhoto.findMany({
+    where: { carId },
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+  });
+  res.json(photos);
+}));
+
+// POST /cars/:id/photos — append a photo to the gallery
+carsRouter.post("/:id/photos", a(async (req, res) => {
+  const carId = parseInt(req.params.id as string, 10);
+  if (isNaN(carId)) { res.status(400).json({ message: "Invalid id" }); return; }
+  const { url, alt, sortOrder } = req.body as { url: string; alt?: string | null; sortOrder?: number };
+  if (!url) { res.status(400).json({ message: "url required" }); return; }
+  const next = sortOrder !== undefined
+    ? sortOrder
+    : ((await prisma.carPhoto.aggregate({ where: { carId }, _max: { sortOrder: true } }))._max.sortOrder ?? -1) + 1;
+  const photo = await prisma.carPhoto.create({
+    data: { carId, url, alt: alt ?? null, sortOrder: next },
+  });
+  res.status(201).json(photo);
+}));
+
+// PATCH /cars/:id/photos/:photoId — update alt or sortOrder
+carsRouter.patch("/:id/photos/:photoId", a(async (req, res) => {
+  const carId = parseInt(req.params.id as string, 10);
+  const photoId = parseInt(req.params.photoId as string, 10);
+  if (isNaN(carId) || isNaN(photoId)) { res.status(400).json({ message: "Invalid id" }); return; }
+  const { alt, sortOrder } = req.body as { alt?: string | null; sortOrder?: number };
+  const photo = await prisma.carPhoto.update({
+    where: { id: photoId, carId },
+    data: {
+      ...(alt !== undefined ? { alt } : {}),
+      ...(sortOrder !== undefined ? { sortOrder } : {}),
+    },
+  });
+  res.json(photo);
+}));
+
+// PUT /cars/:id/photos/order — bulk reorder. Body: { ids: number[] } in display order.
+carsRouter.put("/:id/photos/order", a(async (req, res) => {
+  const carId = parseInt(req.params.id as string, 10);
+  if (isNaN(carId)) { res.status(400).json({ message: "Invalid id" }); return; }
+  const { ids } = req.body as { ids: number[] };
+  if (!Array.isArray(ids)) { res.status(400).json({ message: "ids[] required" }); return; }
+  await prisma.$transaction(
+    ids.map((id, idx) =>
+      prisma.carPhoto.update({ where: { id, carId }, data: { sortOrder: idx } })
+    )
+  );
+  const photos = await prisma.carPhoto.findMany({
+    where: { carId },
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+  });
+  res.json(photos);
+}));
+
+// DELETE /cars/:id/photos/:photoId
+carsRouter.delete("/:id/photos/:photoId", a(async (req, res) => {
+  const carId = parseInt(req.params.id as string, 10);
+  const photoId = parseInt(req.params.photoId as string, 10);
+  if (isNaN(carId) || isNaN(photoId)) { res.status(400).json({ message: "Invalid id" }); return; }
+  await prisma.carPhoto.delete({ where: { id: photoId, carId } });
   res.status(204).send();
 }));
 
