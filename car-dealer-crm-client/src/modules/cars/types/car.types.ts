@@ -29,6 +29,11 @@ export interface Car {
   generalPrice: number;
   isAvailable: boolean;
   responsiblePerson: string;
+  accidentFree: boolean;
+  crashed: boolean;
+  airbagReplaced: boolean;
+  crashDetails: string | null;
+  crashBodyParts: string[];
   photoUrl: string | null;
   techPassportUrl: string | null;
   defectsCheckUrl: string | null;

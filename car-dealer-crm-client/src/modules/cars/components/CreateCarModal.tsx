@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createCar, updateCar } from "../services/cars.api";
 import { uploadCarFile } from "../services/storage";
 import type { Car } from "../types/car.types";
+import { CRASH_BODY_PARTS, CRASH_BODY_PART_LABELS } from "../lib/crash-body-parts";
 import { PhotoGalleryModal } from "./PhotoGalleryModal";
 
 type StagedPhoto = {
@@ -48,7 +49,13 @@ const DEFAULTS: FormData = {
   photoUrl: null,
   techPassportUrl: null,
   defectsCheckUrl: null,
+  accidentFree: false,
+  crashed: false,
+  airbagReplaced: false,
+  crashDetails: null,
+  crashBodyParts: [],
 };
+
 
 interface Props {
   car?: Car;
@@ -67,6 +74,8 @@ function carToForm(car: Car): FormData {
     isCryptoAvailable: car.isCryptoAvailable, isAvailable: car.isAvailable,
     responsiblePerson: car.responsiblePerson,
     photoUrl: car.photoUrl, techPassportUrl: car.techPassportUrl, defectsCheckUrl: car.defectsCheckUrl,
+    accidentFree: car.accidentFree, crashed: car.crashed, airbagReplaced: car.airbagReplaced,
+    crashDetails: car.crashDetails, crashBodyParts: [...(car.crashBodyParts ?? [])],
     // Normalize Prisma Decimal / numeric fields to avoid false positives
     year: Number(car.year), mileage: Number(car.mileage),
     engineVolume: Number(car.engineVolume), enginePower: Number(car.enginePower),
@@ -78,7 +87,12 @@ function carToForm(car: Car): FormData {
 
 function getChangedFields(current: FormData, initial: FormData): Partial<FormData> {
   return (Object.keys(current) as (keyof FormData)[]).reduce((acc, key) => {
-    if (current[key] !== initial[key]) acc[key] = current[key] as any;
+    const a = current[key];
+    const b = initial[key];
+    const changed = Array.isArray(a) || Array.isArray(b)
+      ? JSON.stringify(a ?? []) !== JSON.stringify(b ?? [])
+      : a !== b;
+    if (changed) acc[key] = current[key] as any;
     return acc;
   }, {} as Partial<FormData>);
 }
@@ -432,6 +446,119 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
                 </label>
               </div>
             </div>
+          </section>
+
+          <section className="form-section">
+            <h3>Історія ремонту</h3>
+            <div className="form-grid">
+              <div className="form-field form-field-checkbox">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={form.accidentFree}
+                    onChange={(e) => {
+                      const val = e.target.checked;
+                      setForm((prev) => ({
+                        ...prev,
+                        accidentFree: val,
+                        // If marked accident-free, ensure crashed/airbag/parts are cleared.
+                        ...(val ? { crashed: false, airbagReplaced: false, crashBodyParts: [], crashDetails: null } : {}),
+                      }));
+                    }}
+                  />
+                  Без ДТП (підтверджено)
+                </label>
+              </div>
+              <div className="form-field form-field-checkbox">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={form.crashed}
+                    onChange={(e) => {
+                      const val = e.target.checked;
+                      setForm((prev) => ({
+                        ...prev,
+                        crashed: val,
+                        // Toggling on cancels the accident-free claim.
+                        ...(val ? { accidentFree: false } : { airbagReplaced: false, crashBodyParts: [], crashDetails: null }),
+                      }));
+                    }}
+                  />
+                  Був у ДТП / є ремонти
+                </label>
+              </div>
+            </div>
+
+            {form.crashed && (
+              <>
+                <div className="form-field" style={{ marginTop: 12 }}>
+                  <label>Пошкоджені зони</label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {CRASH_BODY_PARTS.map((part) => {
+                      const active = form.crashBodyParts.includes(part);
+                      return (
+                        <button
+                          key={part}
+                          type="button"
+                          onClick={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              crashBodyParts: active
+                                ? prev.crashBodyParts.filter((p) => p !== part)
+                                : [...prev.crashBodyParts, part],
+                            }))
+                          }
+                          style={{
+                            background: active ? "#facc15" : "#15151f",
+                            color: active ? "#1a1a2e" : "#cbd5e1",
+                            border: `1px solid ${active ? "#facc15" : "#2a2a3a"}`,
+                            borderRadius: 999,
+                            padding: "4px 10px",
+                            fontSize: 12,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {CRASH_BODY_PART_LABELS[part]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="form-grid" style={{ marginTop: 12 }}>
+                  <div className="form-field form-field-checkbox">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={form.airbagReplaced}
+                        onChange={(e) => set("airbagReplaced", e.target.checked)}
+                      />
+                      Подушки безпеки замінювали
+                    </label>
+                  </div>
+                </div>
+
+                <div className="form-field" style={{ marginTop: 12 }}>
+                  <label>Деталі ремонту</label>
+                  <textarea
+                    rows={3}
+                    value={form.crashDetails ?? ""}
+                    onChange={(e) => set("crashDetails", e.target.value || null)}
+                    placeholder="Що саме ремонтували, коли, де"
+                    style={{
+                      width: "100%",
+                      background: "#0e0e16",
+                      border: "1px solid #2a2a3a",
+                      borderRadius: 6,
+                      color: "#fff",
+                      padding: "8px 10px",
+                      fontSize: 13,
+                      resize: "vertical",
+                    }}
+                  />
+                </div>
+              </>
+            )}
           </section>
 
           <section className="form-section">

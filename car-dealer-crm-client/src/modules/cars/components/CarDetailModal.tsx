@@ -1,4 +1,5 @@
 import type { Car } from "../types/car.types";
+import { CRASH_BODY_PART_LABELS } from "../lib/crash-body-parts";
 
 interface Props {
   car: Car;
@@ -142,6 +143,101 @@ export function CarDetailModal({ car, onClose, onEdit }: Props) {
               {car.priceChangedAt && <Field label="Ціна оновлена" value={fmtDate(car.priceChangedAt)} />}
             </div>
           </div>
+
+          {(car.crashed || car.accidentFree) && (
+            <div className="detail-section">
+              <h3 className="detail-section-title">Історія ремонту</h3>
+              {car.accidentFree && !car.crashed && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "10px 14px",
+                    borderRadius: 10,
+                    background: "rgba(34,197,94,0.12)",
+                    border: "1px solid rgba(34,197,94,0.4)",
+                    color: "#86efac",
+                    fontSize: 13,
+                  }}
+                >
+                  <span style={{ fontSize: 18 }}>🛡</span>
+                  <span>Без ДТП — підтверджено власником</span>
+                </div>
+              )}
+
+              {car.crashed && (
+                <div
+                  style={{
+                    padding: 14,
+                    borderRadius: 10,
+                    background: "rgba(250,204,21,0.08)",
+                    border: "1px solid rgba(250,204,21,0.35)",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, color: "#fbbf24", fontWeight: 600, fontSize: 13 }}>
+                    ⚠ Був у ДТП / були ремонти
+                  </div>
+
+                  {car.crashBodyParts.length > 0 && (
+                    <>
+                      <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+                        Пошкоджені зони
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+                        {car.crashBodyParts.map((p) => (
+                          <span
+                            key={p}
+                            style={{
+                              background: "#15151f",
+                              border: "1px solid #2a2a3a",
+                              color: "#e2e8f0",
+                              borderRadius: 999,
+                              padding: "3px 9px",
+                              fontSize: 12,
+                            }}
+                          >
+                            {(CRASH_BODY_PART_LABELS as Record<string, string>)[p] ?? p}
+                          </span>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "3px 9px",
+                      borderRadius: 6,
+                      fontSize: 12,
+                      background: car.airbagReplaced ? "rgba(250,204,21,0.15)" : "#15151f",
+                      border: `1px solid ${car.airbagReplaced ? "rgba(250,204,21,0.4)" : "#2a2a3a"}`,
+                      color: car.airbagReplaced ? "#fbbf24" : "#94a3b8",
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: "inline-block",
+                        width: 6,
+                        height: 6,
+                        borderRadius: 999,
+                        background: car.airbagReplaced ? "#fbbf24" : "#22c55e",
+                      }}
+                    />
+                    {car.airbagReplaced ? "Подушки замінювали" : "Подушки цілі"}
+                  </div>
+
+                  {car.crashDetails && (
+                    <p style={{ marginTop: 12, fontSize: 13, color: "#cbd5e1", whiteSpace: "pre-line" }}>
+                      {car.crashDetails}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {(car.techPassportUrl || car.defectsCheckUrl) && (
             <div className="detail-section">

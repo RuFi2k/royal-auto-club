@@ -123,6 +123,13 @@ model Car {
   generalPrice         Decimal           @db.Decimal(12, 2) // base/internal price
   isAvailable          Boolean           @default(true)
 
+  // Repair history (for transparency on the public listing)
+  accidentFree         Boolean           @default(false)
+  crashed              Boolean           @default(false)
+  airbagReplaced       Boolean           @default(false)
+  crashDetails         String?
+  crashBodyParts       String[]          @default([])
+
   // Management
   responsiblePerson    String            // user email or ID
 
