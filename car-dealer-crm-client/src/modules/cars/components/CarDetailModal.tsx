@@ -144,6 +144,25 @@ export function CarDetailModal({ car, onClose, onEdit }: Props) {
             </div>
           </div>
 
+          {(car.shortDescription || car.description) && (
+            <div className="detail-section">
+              <h3 className="detail-section-title">Опис</h3>
+              {car.shortDescription && (
+                <p style={{ fontSize: 14, color: "#cbd5e1", margin: "0 0 12px" }}>
+                  {car.shortDescription}
+                </p>
+              )}
+              {car.description && (
+                <div
+                  className="detail-rich"
+                  // Server-side sanitized via sanitize-html (allowlist-based) before save.
+                  // eslint-disable-next-line react/no-danger
+                  dangerouslySetInnerHTML={{ __html: car.description }}
+                />
+              )}
+            </div>
+          )}
+
           {(car.crashed || car.accidentFree) && (
             <div className="detail-section">
               <h3 className="detail-section-title">Історія ремонту</h3>

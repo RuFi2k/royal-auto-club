@@ -123,6 +123,10 @@ model Car {
   generalPrice         Decimal           @db.Decimal(12, 2) // base/internal price
   isAvailable          Boolean           @default(true)
 
+  // Public-facing copy
+  shortDescription     String?           // one-liner shown on cards / OG description
+  description          String?           // long-form HTML (TipTap output, sanitized server-side)
+
   // Repair history (for transparency on the public listing)
   accidentFree         Boolean           @default(false)
   crashed              Boolean           @default(false)

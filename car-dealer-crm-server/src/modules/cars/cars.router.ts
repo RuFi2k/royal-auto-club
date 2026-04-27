@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { CarsService } from "./cars.service";
 import { prisma } from "../../db";
 import { requireAuth, AuthRequest } from "../../middleware/auth.middleware";
+import { sanitizeRichText } from "../../lib/sanitize-html";
 
 export const carsRouter = Router();
 
@@ -86,6 +87,10 @@ carsRouter.post("/", a(async (req, res) => {
   if (Array.isArray(photos) && photos.length > 0 && !carInput.photoUrl) {
     carInput.photoUrl = photos[0].url;
   }
+  // Sanitize rich-text on entry — admin UI is trusted but defense-in-depth.
+  if ("description" in carInput) {
+    carInput.description = sanitizeRichText(carInput.description);
+  }
 
   const car = await CarsService.create(carInput as Parameters<typeof CarsService.create>[0], uid(req));
 
@@ -110,7 +115,11 @@ carsRouter.post("/", a(async (req, res) => {
 carsRouter.patch("/:id", a(async (req, res) => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) { res.status(400).json({ message: "Invalid id" }); return; }
-  const car = await CarsService.update(id, req.body, uid(req));
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  if ("description" in body) {
+    body.description = sanitizeRichText(body.description);
+  }
+  const car = await CarsService.update(id, body, uid(req));
   res.json(car);
 }));
 

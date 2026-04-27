@@ -4,6 +4,7 @@ import { uploadCarFile } from "../services/storage";
 import type { Car } from "../types/car.types";
 import { CRASH_BODY_PARTS, CRASH_BODY_PART_LABELS } from "../lib/crash-body-parts";
 import { PhotoGalleryModal } from "./PhotoGalleryModal";
+import { RichTextEditor } from "./RichTextEditor";
 
 type StagedPhoto = {
   key: string;       // local stable id
@@ -46,6 +47,8 @@ const DEFAULTS: FormData = {
   generalPrice: 0,
   isAvailable: true,
   responsiblePerson: "",
+  shortDescription: null,
+  description: null,
   photoUrl: null,
   techPassportUrl: null,
   defectsCheckUrl: null,
@@ -73,6 +76,7 @@ function carToForm(car: Car): FormData {
     carLocation: car.carLocation, location: car.location, sellType: car.sellType,
     isCryptoAvailable: car.isCryptoAvailable, isAvailable: car.isAvailable,
     responsiblePerson: car.responsiblePerson,
+    shortDescription: car.shortDescription, description: car.description,
     photoUrl: car.photoUrl, techPassportUrl: car.techPassportUrl, defectsCheckUrl: car.defectsCheckUrl,
     accidentFree: car.accidentFree, crashed: car.crashed, airbagReplaced: car.airbagReplaced,
     crashDetails: car.crashDetails, crashBodyParts: [...(car.crashBodyParts ?? [])],
@@ -445,6 +449,28 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
                   Доступний для купівлі
                 </label>
               </div>
+            </div>
+          </section>
+
+          <section className="form-section">
+            <h3>Опис</h3>
+            <div className="form-field">
+              <label>Короткий опис (один рядок)</label>
+              <input
+                type="text"
+                value={form.shortDescription ?? ""}
+                onChange={(e) => set("shortDescription", e.target.value || null)}
+                placeholder="Видно на картках та у соц-мережах"
+                maxLength={240}
+              />
+            </div>
+            <div className="form-field" style={{ marginTop: 12 }}>
+              <label>Повний опис</label>
+              <RichTextEditor
+                value={form.description}
+                onChange={(html) => set("description", html)}
+                placeholder="Розкажіть історію автомобіля: комплектація, обслуговування, особливі деталі…"
+              />
             </div>
           </section>
 

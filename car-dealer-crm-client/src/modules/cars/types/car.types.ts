@@ -29,6 +29,8 @@ export interface Car {
   generalPrice: number;
   isAvailable: boolean;
   responsiblePerson: string;
+  shortDescription: string | null;
+  description: string | null;
   accidentFree: boolean;
   crashed: boolean;
   airbagReplaced: boolean;
