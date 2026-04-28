@@ -5,6 +5,7 @@ import cron from "node-cron";
 import { carsRouter } from "./modules/cars/cars.router";
 import { statsRouter } from "./modules/stats/stats.router";
 import { usersRouter } from "./modules/users/users.router";
+import { publicRouter } from "./modules/public/public.router";
 import { prisma } from "./db";
 import { runBackup } from "./lib/backup";
 
@@ -25,21 +26,13 @@ app.use(
   })
 );
 
+app.use("/public", publicRouter);
 app.use("/cars", carsRouter);
 app.use("/stats", statsRouter);
 app.use("/users", usersRouter);
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
-});
-
-app.post("/admin/backup", async (_req, res) => {
-  try {
-    const filepath = await runBackup();
-    res.json({ message: "Backup created", filepath });
-  } catch (err) {
-    res.status(500).json({ message: (err as Error).message });
-  }
 });
 
 // Global error handler — prevents stack traces leaking to clients

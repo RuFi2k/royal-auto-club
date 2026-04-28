@@ -1,0 +1,13 @@
+{
+  "emulators": {
+    "auth":    { "host": "0.0.0.0", "port": 9099 },
+    "storage": { "host": "0.0.0.0", "port": 9199 },
+    "ui":      { "host": "0.0.0.0", "port": 4000, "enabled": true },
+    "hub":     { "host": "0.0.0.0", "port": 4400 },
+    "logging": { "host": "0.0.0.0", "port": 4500 },
+    "singleProjectMode": true
+  },
+  "storage": {
+    "rules": "storage.rules"
+  }
+}

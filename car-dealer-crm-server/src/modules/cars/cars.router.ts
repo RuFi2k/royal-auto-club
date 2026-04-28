@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { CarsService } from "./cars.service";
 import { prisma } from "../../db";
 import { requireAuth, AuthRequest } from "../../middleware/auth.middleware";
+import { sanitizeRichText } from "../../lib/sanitize-html";
 
 export const carsRouter = Router();
 
@@ -48,21 +49,37 @@ carsRouter.get("/audit-logs", a(async (req, res) => {
 
 // GET /cars
 carsRouter.get("/", a(async (req, res) => {
-  const { id, brand, model, mileageMin, mileageMax, priceMin, priceMax, isAvailable, carOrigin, carLocation, responsiblePerson, page, pageSize } = req.query;
+  const q = req.query;
   const result = await CarsService.getAll({
-    id: id ? parseInt(str(id)!, 10) : undefined,
-    brand: str(brand),
-    model: str(model),
-    mileageMin: mileageMin ? parseInt(str(mileageMin)!, 10) : undefined,
-    mileageMax: mileageMax ? parseInt(str(mileageMax)!, 10) : undefined,
-    priceMin: priceMin ? parseFloat(str(priceMin)!) : undefined,
-    priceMax: priceMax ? parseFloat(str(priceMax)!) : undefined,
-    isAvailable: isAvailable !== undefined ? str(isAvailable) === "true" : undefined,
-    carOrigin: str(carOrigin),
-    carLocation: str(carLocation),
-    responsiblePerson: str(responsiblePerson),
-    page: page ? Math.max(1, parseInt(str(page)!, 10)) : undefined,
-    pageSize: pageSize ? Math.min(100, Math.max(1, parseInt(str(pageSize)!, 10))) : undefined,
+    id: q.id ? parseInt(str(q.id)!, 10) : undefined,
+    brand: str(q.brand),
+    model: str(q.model),
+    mileageMin: q.mileageMin ? parseInt(str(q.mileageMin)!, 10) : undefined,
+    mileageMax: q.mileageMax ? parseInt(str(q.mileageMax)!, 10) : undefined,
+    priceMin: q.priceMin ? parseFloat(str(q.priceMin)!) : undefined,
+    priceMax: q.priceMax ? parseFloat(str(q.priceMax)!) : undefined,
+    isAvailable: q.isAvailable !== undefined ? str(q.isAvailable) === "true" : undefined,
+    carOrigin: str(q.carOrigin),
+    carLocation: str(q.carLocation),
+    responsiblePerson: str(q.responsiblePerson),
+    bodyType: str(q.bodyType),
+    engineType: str(q.engineType),
+    gearboxType: str(q.gearboxType),
+    drivetrain: str(q.drivetrain),
+    cabinType: str(q.cabinType),
+    customsStatus: str(q.customsStatus),
+    sellType: str(q.sellType),
+    yearMin: q.yearMin ? parseInt(str(q.yearMin)!, 10) : undefined,
+    yearMax: q.yearMax ? parseInt(str(q.yearMax)!, 10) : undefined,
+    enginePowerMin: q.enginePowerMin ? parseInt(str(q.enginePowerMin)!, 10) : undefined,
+    enginePowerMax: q.enginePowerMax ? parseInt(str(q.enginePowerMax)!, 10) : undefined,
+    engineVolumeMin: q.engineVolumeMin ? parseFloat(str(q.engineVolumeMin)!) : undefined,
+    engineVolumeMax: q.engineVolumeMax ? parseFloat(str(q.engineVolumeMax)!) : undefined,
+    seatsMin: q.seatsMin ? parseInt(str(q.seatsMin)!, 10) : undefined,
+    seatsMax: q.seatsMax ? parseInt(str(q.seatsMax)!, 10) : undefined,
+    isCryptoAvailable: q.isCryptoAvailable !== undefined ? str(q.isCryptoAvailable) === "true" : undefined,
+    page: q.page ? Math.max(1, parseInt(str(q.page)!, 10)) : undefined,
+    pageSize: q.pageSize ? Math.min(100, Math.max(1, parseInt(str(q.pageSize)!, 10))) : undefined,
   });
   res.json(result);
 }));
@@ -78,15 +95,47 @@ carsRouter.get("/:id", a(async (req, res) => {
 
 // POST /cars
 carsRouter.post("/", a(async (req, res) => {
-  const car = await CarsService.create(req.body, uid(req));
-  res.status(201).json(car);
+  const { photos, ...carInput } = (req.body ?? {}) as Record<string, unknown> & {
+    photos?: Array<{ url: string; alt?: string | null }>;
+  };
+
+  // Denormalize cover from gallery if explicit photoUrl wasn't provided.
+  if (Array.isArray(photos) && photos.length > 0 && !carInput.photoUrl) {
+    carInput.photoUrl = photos[0].url;
+  }
+  // Sanitize rich-text on entry — admin UI is trusted but defense-in-depth.
+  if ("description" in carInput) {
+    carInput.description = sanitizeRichText(carInput.description);
+  }
+
+  const car = await CarsService.create(carInput as Parameters<typeof CarsService.create>[0], uid(req));
+
+  if (Array.isArray(photos) && photos.length > 0) {
+    await prisma.$transaction(
+      photos.map((p, idx) =>
+        prisma.carPhoto.create({
+          data: { carId: car.id, url: p.url, alt: p.alt ?? null, sortOrder: idx },
+        })
+      )
+    );
+  }
+
+  const withPhotos = await prisma.car.findUnique({
+    where: { id: car.id },
+    include: { photos: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] } },
+  });
+  res.status(201).json(withPhotos ?? car);
 }));
 
 // PATCH /cars/:id
 carsRouter.patch("/:id", a(async (req, res) => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) { res.status(400).json({ message: "Invalid id" }); return; }
-  const car = await CarsService.update(id, req.body, uid(req));
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  if ("description" in body) {
+    body.description = sanitizeRichText(body.description);
+  }
+  const car = await CarsService.update(id, body, uid(req));
   res.json(car);
 }));
 
@@ -104,6 +153,75 @@ carsRouter.delete("/:id", a(async (req, res) => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) { res.status(400).json({ message: "Invalid id" }); return; }
   await CarsService.delete(id, uid(req));
+  res.status(204).send();
+}));
+
+// GET /cars/:id/photos — gallery, sorted by sortOrder asc
+carsRouter.get("/:id/photos", a(async (req, res) => {
+  const carId = parseInt(req.params.id as string, 10);
+  if (isNaN(carId)) { res.status(400).json({ message: "Invalid id" }); return; }
+  const photos = await prisma.carPhoto.findMany({
+    where: { carId },
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+  });
+  res.json(photos);
+}));
+
+// POST /cars/:id/photos — append a photo to the gallery
+carsRouter.post("/:id/photos", a(async (req, res) => {
+  const carId = parseInt(req.params.id as string, 10);
+  if (isNaN(carId)) { res.status(400).json({ message: "Invalid id" }); return; }
+  const { url, alt, sortOrder } = req.body as { url: string; alt?: string | null; sortOrder?: number };
+  if (!url) { res.status(400).json({ message: "url required" }); return; }
+  const next = sortOrder !== undefined
+    ? sortOrder
+    : ((await prisma.carPhoto.aggregate({ where: { carId }, _max: { sortOrder: true } }))._max.sortOrder ?? -1) + 1;
+  const photo = await prisma.carPhoto.create({
+    data: { carId, url, alt: alt ?? null, sortOrder: next },
+  });
+  res.status(201).json(photo);
+}));
+
+// PATCH /cars/:id/photos/:photoId — update alt or sortOrder
+carsRouter.patch("/:id/photos/:photoId", a(async (req, res) => {
+  const carId = parseInt(req.params.id as string, 10);
+  const photoId = parseInt(req.params.photoId as string, 10);
+  if (isNaN(carId) || isNaN(photoId)) { res.status(400).json({ message: "Invalid id" }); return; }
+  const { alt, sortOrder } = req.body as { alt?: string | null; sortOrder?: number };
+  const photo = await prisma.carPhoto.update({
+    where: { id: photoId, carId },
+    data: {
+      ...(alt !== undefined ? { alt } : {}),
+      ...(sortOrder !== undefined ? { sortOrder } : {}),
+    },
+  });
+  res.json(photo);
+}));
+
+// PUT /cars/:id/photos/order — bulk reorder. Body: { ids: number[] } in display order.
+carsRouter.put("/:id/photos/order", a(async (req, res) => {
+  const carId = parseInt(req.params.id as string, 10);
+  if (isNaN(carId)) { res.status(400).json({ message: "Invalid id" }); return; }
+  const { ids } = req.body as { ids: number[] };
+  if (!Array.isArray(ids)) { res.status(400).json({ message: "ids[] required" }); return; }
+  await prisma.$transaction(
+    ids.map((id, idx) =>
+      prisma.carPhoto.update({ where: { id, carId }, data: { sortOrder: idx } })
+    )
+  );
+  const photos = await prisma.carPhoto.findMany({
+    where: { carId },
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+  });
+  res.json(photos);
+}));
+
+// DELETE /cars/:id/photos/:photoId
+carsRouter.delete("/:id/photos/:photoId", a(async (req, res) => {
+  const carId = parseInt(req.params.id as string, 10);
+  const photoId = parseInt(req.params.photoId as string, 10);
+  if (isNaN(carId) || isNaN(photoId)) { res.status(400).json({ message: "Invalid id" }); return; }
+  await prisma.carPhoto.delete({ where: { id: photoId, carId } });
   res.status(204).send();
 }));
 

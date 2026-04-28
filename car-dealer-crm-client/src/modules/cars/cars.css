@@ -946,3 +946,119 @@
   gap: 6px;
   flex-shrink: 0;
 }
+
+/* Rich text editor (TipTap) */
+.rte-wrap {
+  border: 1px solid #2a2a3a;
+  border-radius: 8px;
+  background: #0e0e16;
+  overflow: hidden;
+}
+.rte-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 6px;
+  background: #15151f;
+  border-bottom: 1px solid #2a2a3a;
+}
+.rte-btn {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 100ms, border-color 100ms;
+}
+.rte-btn:hover:not(:disabled) {
+  background: #1f1f2e;
+  border-color: #2a2a3a;
+}
+.rte-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.rte-btn-active {
+  background: #facc15;
+  color: #1a1a2e;
+  border-color: #facc15;
+}
+.rte-btn-active:hover:not(:disabled) {
+  background: #facc15;
+  border-color: #facc15;
+}
+.rte-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 4px 4px;
+  background: #2a2a3a;
+}
+.rte-content {
+  min-height: 140px;
+  padding: 10px 12px;
+  color: #e2e8f0;
+  font-size: 14px;
+  line-height: 1.55;
+  outline: none;
+}
+.rte-content p { margin: 0 0 8px; }
+.rte-content p:last-child { margin-bottom: 0; }
+.rte-content h2 { font-size: 18px; font-weight: 700; margin: 14px 0 6px; color: #f1f5f9; }
+.rte-content h3 { font-size: 15px; font-weight: 700; margin: 12px 0 4px; color: #f1f5f9; }
+.rte-content ul, .rte-content ol { padding-left: 22px; margin: 0 0 8px; }
+.rte-content li { margin: 2px 0; }
+.rte-content blockquote {
+  border-left: 3px solid #2a2a3a;
+  padding-left: 10px;
+  color: #94a3b8;
+  margin: 8px 0;
+}
+.rte-content a { color: #facc15; text-decoration: underline; }
+.rte-content strong { color: #f1f5f9; }
+.rte-content code {
+  background: #1f1f2e;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.rte-content[data-placeholder]:empty::before {
+  content: attr(data-placeholder);
+  color: #475569;
+  pointer-events: none;
+}
+
+/* Read-only rendered description (CarDetailModal + future site mirror) */
+.detail-rich {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #e2e8f0;
+}
+.detail-rich p { margin: 0 0 10px; }
+.detail-rich p:last-child { margin-bottom: 0; }
+.detail-rich h2 { font-size: 17px; font-weight: 700; margin: 16px 0 6px; color: #f1f5f9; }
+.detail-rich h3 { font-size: 14px; font-weight: 700; margin: 14px 0 4px; color: #f1f5f9; }
+.detail-rich ul, .detail-rich ol { padding-left: 22px; margin: 0 0 10px; }
+.detail-rich a { color: #facc15; text-decoration: underline; }
+.detail-rich blockquote {
+  border-left: 3px solid #2a2a3a;
+  padding-left: 10px;
+  color: #94a3b8;
+}
+
+/* Extended filter panel — second row revealed via toggle. */
+.cars-filter-extended {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 16px;
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid #2a2a3a;
+  border-radius: 10px;
+  background: #0e0e16;
+}

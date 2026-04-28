@@ -2,6 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { createCar, updateCar } from "../services/cars.api";
 import { uploadCarFile } from "../services/storage";
 import type { Car } from "../types/car.types";
+import { CRASH_BODY_PARTS, CRASH_BODY_PART_LABELS } from "../lib/crash-body-parts";
+import { PhotoGalleryModal } from "./PhotoGalleryModal";
+import { RichTextEditor } from "./RichTextEditor";
+
+type StagedPhoto = {
+  key: string;       // local stable id
+  file: File;
+  previewUrl: string;
+  alt: string;
+};
 
 const DRAFT_KEY = "car-form-draft";
 
@@ -37,10 +47,22 @@ const DEFAULTS: FormData = {
   generalPrice: 0,
   isAvailable: true,
   responsiblePerson: "",
+  listingStatus: "available",
+  eta: null,
+  transitStage: null,
+  estimatedPrice: null,
+  shortDescription: null,
+  description: null,
   photoUrl: null,
   techPassportUrl: null,
   defectsCheckUrl: null,
+  accidentFree: false,
+  crashed: false,
+  airbagReplaced: false,
+  crashDetails: null,
+  crashBodyParts: [],
 };
+
 
 interface Props {
   car?: Car;
@@ -58,7 +80,12 @@ function carToForm(car: Car): FormData {
     carLocation: car.carLocation, location: car.location, sellType: car.sellType,
     isCryptoAvailable: car.isCryptoAvailable, isAvailable: car.isAvailable,
     responsiblePerson: car.responsiblePerson,
+    listingStatus: car.listingStatus, eta: car.eta, transitStage: car.transitStage,
+    estimatedPrice: car.estimatedPrice,
+    shortDescription: car.shortDescription, description: car.description,
     photoUrl: car.photoUrl, techPassportUrl: car.techPassportUrl, defectsCheckUrl: car.defectsCheckUrl,
+    accidentFree: car.accidentFree, crashed: car.crashed, airbagReplaced: car.airbagReplaced,
+    crashDetails: car.crashDetails, crashBodyParts: [...(car.crashBodyParts ?? [])],
     // Normalize Prisma Decimal / numeric fields to avoid false positives
     year: Number(car.year), mileage: Number(car.mileage),
     engineVolume: Number(car.engineVolume), enginePower: Number(car.enginePower),
@@ -70,7 +97,12 @@ function carToForm(car: Car): FormData {
 
 function getChangedFields(current: FormData, initial: FormData): Partial<FormData> {
   return (Object.keys(current) as (keyof FormData)[]).reduce((acc, key) => {
-    if (current[key] !== initial[key]) acc[key] = current[key] as any;
+    const a = current[key];
+    const b = initial[key];
+    const changed = Array.isArray(a) || Array.isArray(b)
+      ? JSON.stringify(a ?? []) !== JSON.stringify(b ?? [])
+      : a !== b;
+    if (changed) acc[key] = current[key] as any;
     return acc;
   }, {} as Partial<FormData>);
 }
@@ -90,11 +122,17 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
   }
 
   const [form, setForm] = useState<FormData>(loadInitial);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [techPassportFile, setTechPassportFile] = useState<File | null>(null);
   const [defectsCheckFile, setDefectsCheckFile] = useState<File | null>(null);
+  const [stagedPhotos, setStagedPhotos] = useState<StagedPhoto[]>([]);
+  const [showGalleryModal, setShowGalleryModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Revoke object URLs when staged photos are removed/unmounted
+  useEffect(() => () => {
+    stagedPhotos.forEach((p) => URL.revokeObjectURL(p.previewUrl));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist draft to sessionStorage on every change (CREATE mode only)
   useEffect(() => {
@@ -131,7 +169,6 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
     setError(null);
     try {
       const fileUploads: Partial<FormData> = {};
-      if (photoFile) fileUploads.photoUrl = await uploadCarFile(photoFile, "photos");
       if (techPassportFile) fileUploads.techPassportUrl = await uploadCarFile(techPassportFile, "tech-passports");
       if (defectsCheckFile) fileUploads.defectsCheckUrl = await uploadCarFile(defectsCheckFile, "defects-checks");
 
@@ -146,7 +183,15 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
         }
         saved = await updateCar(car.id, changes);
       } else {
-        saved = await createCar(formWithFiles);
+        // CREATE mode — upload staged gallery photos, then POST with photos[]
+        const uploadedPhotos: Array<{ url: string; alt: string | null }> = [];
+        for (const p of stagedPhotos) {
+          const url = await uploadCarFile(p.file, "photos");
+          uploadedPhotos.push({ url, alt: p.alt || null });
+        }
+        const payload: any = { ...formWithFiles };
+        if (uploadedPhotos.length > 0) payload.photos = uploadedPhotos;
+        saved = await createCar(payload);
       }
       if (isCreate) sessionStorage.removeItem(DRAFT_KEY);
       onSaved(saved);
@@ -155,6 +200,41 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function addStagedPhotos(files: FileList | File[]) {
+    const arr = Array.from(files);
+    if (arr.length === 0) return;
+    const additions: StagedPhoto[] = arr.map((file) => ({
+      key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      file,
+      previewUrl: URL.createObjectURL(file),
+      alt: "",
+    }));
+    setStagedPhotos((prev) => [...prev, ...additions]);
+  }
+
+  function removeStagedPhoto(key: string) {
+    setStagedPhotos((prev) => {
+      const target = prev.find((p) => p.key === key);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((p) => p.key !== key);
+    });
+  }
+
+  function moveStagedPhoto(key: string, delta: number) {
+    setStagedPhotos((prev) => {
+      const idx = prev.findIndex((p) => p.key === key);
+      const target = idx + delta;
+      if (idx < 0 || target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[target]] = [next[target], next[idx]];
+      return next;
+    });
+  }
+
+  function setStagedAlt(key: string, alt: string) {
+    setStagedPhotos((prev) => prev.map((p) => (p.key === key ? { ...p, alt } : p)));
   }
 
   return (
@@ -379,18 +459,354 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
           </section>
 
           <section className="form-section">
-            <h3>Фото та документи</h3>
-            <div className="form-grid">
+            <h3>Опис</h3>
+            <div className="form-field">
+              <label>Короткий опис (один рядок)</label>
+              <input
+                type="text"
+                value={form.shortDescription ?? ""}
+                onChange={(e) => set("shortDescription", e.target.value || null)}
+                placeholder="Видно на картках та у соц-мережах"
+                maxLength={240}
+              />
+            </div>
+            <div className="form-field" style={{ marginTop: 12 }}>
+              <label>Повний опис</label>
+              <RichTextEditor
+                value={form.description}
+                onChange={(html) => set("description", html)}
+                placeholder="Розкажіть історію автомобіля: комплектація, обслуговування, особливі деталі…"
+              />
+            </div>
+          </section>
 
+          <section className="form-section">
+            <h3>Статус оголошення</h3>
+            <div className="form-grid">
               <div className="form-field">
-                <label>Фото автомобіля</label>
-                {form.photoUrl && !photoFile && (
-                  <img src={form.photoUrl} alt="Фото" className="upload-preview" />
-                )}
-                {photoFile && <span className="upload-filename">📷 {photoFile.name}</span>}
-                <input type="file" accept="image/*" className="upload-input"
-                  onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)} />
+                <label>Статус *</label>
+                <select
+                  value={form.listingStatus}
+                  onChange={(e) => {
+                    const next = e.target.value as FormData["listingStatus"];
+                    setForm((prev) => ({
+                      ...prev,
+                      listingStatus: next,
+                      // Mirror the legacy isAvailable boolean and clear
+                      // upcoming-only fields when leaving that state.
+                      isAvailable: next === "available",
+                      ...(next !== "upcoming" ? { transitStage: null } : {}),
+                    }));
+                  }}
+                >
+                  <option value="upcoming">Очікується (в дорозі)</option>
+                  <option value="available">У наявності</option>
+                  <option value="sold">Продано</option>
+                  <option value="archived">Архів (приховано)</option>
+                </select>
               </div>
+              {form.listingStatus === "upcoming" && (
+                <>
+                  <div className="form-field">
+                    <label>Очікувана дата прибуття</label>
+                    <input
+                      type="date"
+                      value={form.eta ? form.eta.slice(0, 10) : ""}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        set("eta", v ? new Date(v).toISOString() : null);
+                      }}
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label>Етап логістики</label>
+                    <select
+                      value={form.transitStage ?? ""}
+                      onChange={(e) => set("transitStage", (e.target.value || null) as FormData["transitStage"])}
+                    >
+                      <option value="">—</option>
+                      <option value="ordered">Замовлено</option>
+                      <option value="in_transit">В дорозі</option>
+                      <option value="at_port">У порту</option>
+                      <option value="customs">Розмитнення</option>
+                      <option value="ready">Готове</option>
+                    </select>
+                  </div>
+                  <div className="form-field">
+                    <label>Орієнтовна ціна ($)</label>
+                    <input
+                      type="number"
+                      placeholder="напр. 71500"
+                      value={form.estimatedPrice ?? ""}
+                      onChange={(e) => set("estimatedPrice", e.target.value === "" ? null : Number(e.target.value))}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </section>
+
+          <section className="form-section">
+            <h3>Історія ремонту</h3>
+            <div className="form-grid">
+              <div className="form-field form-field-checkbox">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={form.accidentFree}
+                    onChange={(e) => {
+                      const val = e.target.checked;
+                      setForm((prev) => ({
+                        ...prev,
+                        accidentFree: val,
+                        // If marked accident-free, ensure crashed/airbag/parts are cleared.
+                        ...(val ? { crashed: false, airbagReplaced: false, crashBodyParts: [], crashDetails: null } : {}),
+                      }));
+                    }}
+                  />
+                  Без ДТП (підтверджено)
+                </label>
+              </div>
+              <div className="form-field form-field-checkbox">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={form.crashed}
+                    onChange={(e) => {
+                      const val = e.target.checked;
+                      setForm((prev) => ({
+                        ...prev,
+                        crashed: val,
+                        // Toggling on cancels the accident-free claim.
+                        ...(val ? { accidentFree: false } : { airbagReplaced: false, crashBodyParts: [], crashDetails: null }),
+                      }));
+                    }}
+                  />
+                  Був у ДТП / є ремонти
+                </label>
+              </div>
+            </div>
+
+            {form.crashed && (
+              <>
+                <div className="form-field" style={{ marginTop: 12 }}>
+                  <label>Пошкоджені зони</label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {CRASH_BODY_PARTS.map((part) => {
+                      const active = form.crashBodyParts.includes(part);
+                      return (
+                        <button
+                          key={part}
+                          type="button"
+                          onClick={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              crashBodyParts: active
+                                ? prev.crashBodyParts.filter((p) => p !== part)
+                                : [...prev.crashBodyParts, part],
+                            }))
+                          }
+                          style={{
+                            background: active ? "#facc15" : "#15151f",
+                            color: active ? "#1a1a2e" : "#cbd5e1",
+                            border: `1px solid ${active ? "#facc15" : "#2a2a3a"}`,
+                            borderRadius: 999,
+                            padding: "4px 10px",
+                            fontSize: 12,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {CRASH_BODY_PART_LABELS[part]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="form-grid" style={{ marginTop: 12 }}>
+                  <div className="form-field form-field-checkbox">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={form.airbagReplaced}
+                        onChange={(e) => set("airbagReplaced", e.target.checked)}
+                      />
+                      Подушки безпеки замінювали
+                    </label>
+                  </div>
+                </div>
+
+                <div className="form-field" style={{ marginTop: 12 }}>
+                  <label>Деталі ремонту</label>
+                  <textarea
+                    rows={3}
+                    value={form.crashDetails ?? ""}
+                    onChange={(e) => set("crashDetails", e.target.value || null)}
+                    placeholder="Що саме ремонтували, коли, де"
+                    style={{
+                      width: "100%",
+                      background: "#0e0e16",
+                      border: "1px solid #2a2a3a",
+                      borderRadius: 6,
+                      color: "#fff",
+                      padding: "8px 10px",
+                      fontSize: 13,
+                      resize: "vertical",
+                    }}
+                  />
+                </div>
+              </>
+            )}
+          </section>
+
+          <section className="form-section">
+            <h3>Галерея</h3>
+            {isCreate ? (
+              <>
+                <div className="form-field">
+                  <label>Фото автомобіля (перше — обкладинка)</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="upload-input"
+                    onChange={(e) => {
+                      addStagedPhotos(e.target.files ?? []);
+                      e.target.value = "";
+                    }}
+                  />
+                </div>
+                {stagedPhotos.length > 0 && (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+                      gap: 10,
+                      marginTop: 10,
+                    }}
+                  >
+                    {stagedPhotos.map((p, idx) => (
+                      <div
+                        key={p.key}
+                        style={{
+                          border: "1px solid #2a2a3a",
+                          borderRadius: 10,
+                          overflow: "hidden",
+                          background: "#15151f",
+                          display: "flex",
+                          flexDirection: "column",
+                        }}
+                      >
+                        <div style={{ position: "relative", aspectRatio: "16/10", background: "#000" }}>
+                          <img
+                            src={p.previewUrl}
+                            alt={p.alt}
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          />
+                          {idx === 0 && (
+                            <span
+                              style={{
+                                position: "absolute",
+                                top: 6,
+                                left: 6,
+                                background: "#facc15",
+                                color: "#1a1a2e",
+                                padding: "2px 6px",
+                                borderRadius: 999,
+                                fontSize: 10,
+                                fontWeight: 700,
+                              }}
+                            >
+                              ОБКЛАДИНКА
+                            </span>
+                          )}
+                          <span
+                            style={{
+                              position: "absolute",
+                              top: 6,
+                              right: 6,
+                              background: "rgba(0,0,0,0.6)",
+                              color: "#fff",
+                              padding: "1px 5px",
+                              borderRadius: 6,
+                              fontSize: 10,
+                              fontVariantNumeric: "tabular-nums",
+                            }}
+                          >
+                            #{idx + 1}
+                          </span>
+                        </div>
+                        <div style={{ padding: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+                          <input
+                            type="text"
+                            placeholder="Опис"
+                            value={p.alt}
+                            onChange={(e) => setStagedAlt(p.key, e.target.value)}
+                            style={{
+                              width: "100%",
+                              background: "#0e0e16",
+                              border: "1px solid #2a2a3a",
+                              borderRadius: 6,
+                              color: "#fff",
+                              padding: "4px 6px",
+                              fontSize: 11,
+                            }}
+                          />
+                          <div style={{ display: "flex", gap: 4 }}>
+                            <button
+                              type="button"
+                              className="action-btn action-edit"
+                              onClick={() => moveStagedPhoto(p.key, -1)}
+                              disabled={idx === 0}
+                              title="Підняти вгору"
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              className="action-btn action-edit"
+                              onClick={() => moveStagedPhoto(p.key, 1)}
+                              disabled={idx === stagedPhotos.length - 1}
+                              title="Опустити вниз"
+                            >
+                              ↓
+                            </button>
+                            <button
+                              type="button"
+                              className="action-btn action-sold"
+                              onClick={() => removeStagedPhoto(p.key)}
+                              style={{ marginLeft: "auto" }}
+                            >
+                              Видалити
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="form-field">
+                <label>Фото галереї</label>
+                <button
+                  type="button"
+                  className="action-btn action-edit"
+                  onClick={() => setShowGalleryModal(true)}
+                  style={{ alignSelf: "flex-start" }}
+                >
+                  Відкрити редактор галереї →
+                </button>
+                <p style={{ fontSize: 12, color: "#888", marginTop: 6 }}>
+                  Управляйте обкладинкою, додавайте та видаляйте фото в окремому редакторі.
+                </p>
+              </div>
+            )}
+          </section>
+
+          <section className="form-section">
+            <h3>Документи</h3>
+            <div className="form-grid">
 
               <div className="form-field">
                 <label>Техпаспорт</label>
@@ -437,6 +853,10 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
           </div>
 
         </form>
+
+        {showGalleryModal && car && (
+          <PhotoGalleryModal car={car} onClose={() => setShowGalleryModal(false)} />
+        )}
       </div>
     </div>
   );

@@ -10,16 +10,10 @@ export async function fetchCars(
 ): Promise<CarsPage> {
   const params = new URLSearchParams();
 
-  if (filters.id) params.set("id", filters.id);
-  if (filters.brand) params.set("brand", filters.brand);
-  if (filters.model) params.set("model", filters.model);
-  if (filters.mileageMin) params.set("mileageMin", filters.mileageMin);
-  if (filters.mileageMax) params.set("mileageMax", filters.mileageMax);
-  if (filters.priceMin) params.set("priceMin", filters.priceMin);
-  if (filters.priceMax) params.set("priceMax", filters.priceMax);
-  if (filters.carOrigin) params.set("carOrigin", filters.carOrigin);
-  if (filters.carLocation) params.set("carLocation", filters.carLocation);
-  if (filters.isAvailable) params.set("isAvailable", filters.isAvailable);
+  // Pass through every set filter; server ignores unknown keys.
+  for (const [k, v] of Object.entries(filters)) {
+    if (v !== undefined && v !== null && v !== "") params.set(k, String(v));
+  }
   params.set("page", String(page));
   params.set("pageSize", String(pageSize));
 
