@@ -177,6 +177,11 @@ model Car {
   updatedAt            DateTime          @updatedAt
 
   @@map("cars")
+  @@index([listingStatus])
+  @@index([listingStatus, createdAt(sort: Desc)])
+  @@index([listingStatus, soldAt(sort: Desc)])
+  @@index([brand])
+  @@index([isAvailable])
 }
 
 enum AuditAction {

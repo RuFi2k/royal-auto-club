@@ -34,7 +34,6 @@ export interface CarFilters {
   seatsMin?: number;
   seatsMax?: number;
   isCryptoAvailable?: boolean;
-  q?: string;     // free-text across brand, model, color, descriptions
   page?: number;
   pageSize?: number;
 }
@@ -203,18 +202,6 @@ export const CarsService = {
         ...(rest.seatsMin !== undefined ? { gte: rest.seatsMin } : {}),
         ...(rest.seatsMax !== undefined ? { lte: rest.seatsMax } : {}),
       };
-    }
-    // Free-text — ILIKE across the public-visible columns. Cheap and fine at
-    // small catalog sizes; revisit with a tsvector + GIN index if dataset grows.
-    if (rest.q) {
-      const like = { contains: rest.q, mode: "insensitive" as const };
-      where.OR = [
-        { brand: like },
-        { model: like },
-        { color: like },
-        { shortDescription: like },
-        { description: like },
-      ];
     }
 
     const [data, total] = await Promise.all([

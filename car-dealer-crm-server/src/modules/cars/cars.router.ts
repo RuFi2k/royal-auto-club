@@ -78,7 +78,6 @@ carsRouter.get("/", a(async (req, res) => {
     seatsMin: q.seatsMin ? parseInt(str(q.seatsMin)!, 10) : undefined,
     seatsMax: q.seatsMax ? parseInt(str(q.seatsMax)!, 10) : undefined,
     isCryptoAvailable: q.isCryptoAvailable !== undefined ? str(q.isCryptoAvailable) === "true" : undefined,
-    q: str(q.q),
     page: q.page ? Math.max(1, parseInt(str(q.page)!, 10)) : undefined,
     pageSize: q.pageSize ? Math.min(100, Math.max(1, parseInt(str(q.pageSize)!, 10))) : undefined,
   });

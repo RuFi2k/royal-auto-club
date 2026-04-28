@@ -200,7 +200,7 @@ publicRouter.get("/cars", a(async (req, res) => {
 }));
 
 // GET /public/cars/:id — returns the car regardless of status (sold cars
-// keep working URLs for shareable links and SEO).
+// keep working URLs for shareable links and SEO). Archived cars are hidden.
 publicRouter.get("/cars/:id", a(async (req, res) => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) { res.status(400).json({ message: "Invalid id" }); return; }
@@ -208,6 +208,6 @@ publicRouter.get("/cars/:id", a(async (req, res) => {
     where: { id },
     include: { photos: true },
   });
-  if (!car) { res.status(404).json({ message: "Car not found" }); return; }
+  if (!car || car.listingStatus === "archived") { res.status(404).json({ message: "Car not found" }); return; }
   res.json(toPublicCar(car as CarWithPhotos));
 }));

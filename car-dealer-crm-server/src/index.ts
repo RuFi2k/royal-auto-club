@@ -35,15 +35,6 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-app.post("/admin/backup", async (_req, res) => {
-  try {
-    const filepath = await runBackup();
-    res.json({ message: "Backup created", filepath });
-  } catch (err) {
-    res.status(500).json({ message: (err as Error).message });
-  }
-});
-
 // Global error handler — prevents stack traces leaking to clients
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);

@@ -12,7 +12,7 @@ const EXTENDED_KEYS: Array<keyof CarFilters> = [
   "yearMin", "yearMax",
   "enginePowerMin", "enginePowerMax",
   "engineVolumeMin", "engineVolumeMax",
-  "isCryptoAvailable", "q",
+  "isCryptoAvailable",
 ];
 
 export function CarsFilter({ filters, onChange }: Props) {
@@ -178,16 +178,6 @@ export function CarsFilter({ filters, onChange }: Props) {
 
       {extendedOpen && (
         <div className="cars-filter-extended">
-          <div className="filter-field" style={{ flex: "1 1 240px", minWidth: 240 }}>
-            <label>Пошук (текст)</label>
-            <input
-              type="text"
-              placeholder="напр. панорама, шкіра, electric"
-              value={draft.q ?? ""}
-              onChange={(e) => set("q", e.target.value)}
-              onKeyDown={handleKeyDown}
-            />
-          </div>
 
           <div className="filter-field">
             <label>Кузов</label>
