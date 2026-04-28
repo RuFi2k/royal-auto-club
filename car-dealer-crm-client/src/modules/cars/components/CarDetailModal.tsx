@@ -67,7 +67,13 @@ export function CarDetailModal({ car, onClose, onEdit }: Props) {
             <span className="car-model">{car.model}</span>
             <span className="car-row-id">#{car.id}</span>
             <span className={`badge ${car.isAvailable ? "badge-available" : "badge-unavailable"}`}>
-              {car.isAvailable ? "Наявний" : "Продано"}
+              {car.listingStatus === "upcoming"
+                ? "Очікується"
+                : car.listingStatus === "archived"
+                  ? "Архів"
+                  : car.isAvailable
+                    ? "Наявний"
+                    : "Продано"}
             </span>
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
@@ -143,6 +149,37 @@ export function CarDetailModal({ car, onClose, onEdit }: Props) {
               {car.priceChangedAt && <Field label="Ціна оновлена" value={fmtDate(car.priceChangedAt)} />}
             </div>
           </div>
+
+          {car.listingStatus === "upcoming" && (
+            <div className="detail-section">
+              <h3 className="detail-section-title">Логістика</h3>
+              <div className="detail-grid">
+                {car.eta && (
+                  <Field
+                    label="Очікуване прибуття"
+                    value={new Date(car.eta).toLocaleDateString("uk-UA", { day: "2-digit", month: "long", year: "numeric" })}
+                  />
+                )}
+                {car.transitStage && (
+                  <Field
+                    label="Етап"
+                    value={
+                      ({
+                        ordered: "Замовлено",
+                        in_transit: "В дорозі",
+                        at_port: "У порту",
+                        customs: "Розмитнення",
+                        ready: "Готове",
+                      } as Record<string, string>)[car.transitStage] ?? car.transitStage
+                    }
+                  />
+                )}
+                {car.estimatedPrice != null && (
+                  <Field label="Орієнтовна ціна" value={fmt(car.estimatedPrice)} />
+                )}
+              </div>
+            </div>
+          )}
 
           {(car.shortDescription || car.description) && (
             <div className="detail-section">

@@ -49,21 +49,38 @@ carsRouter.get("/audit-logs", a(async (req, res) => {
 
 // GET /cars
 carsRouter.get("/", a(async (req, res) => {
-  const { id, brand, model, mileageMin, mileageMax, priceMin, priceMax, isAvailable, carOrigin, carLocation, responsiblePerson, page, pageSize } = req.query;
+  const q = req.query;
   const result = await CarsService.getAll({
-    id: id ? parseInt(str(id)!, 10) : undefined,
-    brand: str(brand),
-    model: str(model),
-    mileageMin: mileageMin ? parseInt(str(mileageMin)!, 10) : undefined,
-    mileageMax: mileageMax ? parseInt(str(mileageMax)!, 10) : undefined,
-    priceMin: priceMin ? parseFloat(str(priceMin)!) : undefined,
-    priceMax: priceMax ? parseFloat(str(priceMax)!) : undefined,
-    isAvailable: isAvailable !== undefined ? str(isAvailable) === "true" : undefined,
-    carOrigin: str(carOrigin),
-    carLocation: str(carLocation),
-    responsiblePerson: str(responsiblePerson),
-    page: page ? Math.max(1, parseInt(str(page)!, 10)) : undefined,
-    pageSize: pageSize ? Math.min(100, Math.max(1, parseInt(str(pageSize)!, 10))) : undefined,
+    id: q.id ? parseInt(str(q.id)!, 10) : undefined,
+    brand: str(q.brand),
+    model: str(q.model),
+    mileageMin: q.mileageMin ? parseInt(str(q.mileageMin)!, 10) : undefined,
+    mileageMax: q.mileageMax ? parseInt(str(q.mileageMax)!, 10) : undefined,
+    priceMin: q.priceMin ? parseFloat(str(q.priceMin)!) : undefined,
+    priceMax: q.priceMax ? parseFloat(str(q.priceMax)!) : undefined,
+    isAvailable: q.isAvailable !== undefined ? str(q.isAvailable) === "true" : undefined,
+    carOrigin: str(q.carOrigin),
+    carLocation: str(q.carLocation),
+    responsiblePerson: str(q.responsiblePerson),
+    bodyType: str(q.bodyType),
+    engineType: str(q.engineType),
+    gearboxType: str(q.gearboxType),
+    drivetrain: str(q.drivetrain),
+    cabinType: str(q.cabinType),
+    customsStatus: str(q.customsStatus),
+    sellType: str(q.sellType),
+    yearMin: q.yearMin ? parseInt(str(q.yearMin)!, 10) : undefined,
+    yearMax: q.yearMax ? parseInt(str(q.yearMax)!, 10) : undefined,
+    enginePowerMin: q.enginePowerMin ? parseInt(str(q.enginePowerMin)!, 10) : undefined,
+    enginePowerMax: q.enginePowerMax ? parseInt(str(q.enginePowerMax)!, 10) : undefined,
+    engineVolumeMin: q.engineVolumeMin ? parseFloat(str(q.engineVolumeMin)!) : undefined,
+    engineVolumeMax: q.engineVolumeMax ? parseFloat(str(q.engineVolumeMax)!) : undefined,
+    seatsMin: q.seatsMin ? parseInt(str(q.seatsMin)!, 10) : undefined,
+    seatsMax: q.seatsMax ? parseInt(str(q.seatsMax)!, 10) : undefined,
+    isCryptoAvailable: q.isCryptoAvailable !== undefined ? str(q.isCryptoAvailable) === "true" : undefined,
+    q: str(q.q),
+    page: q.page ? Math.max(1, parseInt(str(q.page)!, 10)) : undefined,
+    pageSize: q.pageSize ? Math.min(100, Math.max(1, parseInt(str(q.pageSize)!, 10))) : undefined,
   });
   res.json(result);
 }));

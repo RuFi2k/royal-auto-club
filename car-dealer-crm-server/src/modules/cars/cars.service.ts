@@ -17,6 +17,24 @@ export interface CarFilters {
   carOrigin?: string;
   carLocation?: string;
   responsiblePerson?: string;
+  // Extended (added when AI search + faceted browsing landed)
+  bodyType?: string;
+  engineType?: string;
+  gearboxType?: string;
+  drivetrain?: string;
+  cabinType?: string;
+  customsStatus?: string;
+  sellType?: string;
+  yearMin?: number;
+  yearMax?: number;
+  enginePowerMin?: number;
+  enginePowerMax?: number;
+  engineVolumeMin?: number;
+  engineVolumeMax?: number;
+  seatsMin?: number;
+  seatsMax?: number;
+  isCryptoAvailable?: boolean;
+  q?: string;     // free-text across brand, model, color, descriptions
   page?: number;
   pageSize?: number;
 }
@@ -34,6 +52,52 @@ function encryptInput(data: Record<string, unknown>): Record<string, unknown> {
   if (typeof data.vinNumber === "string") {
     result.vinNumberHash = hmac(data.vinNumber as string);
   }
+  return result;
+}
+
+// Keep listingStatus and isAvailable / soldAt in sync. listingStatus is the
+// canonical lifecycle field; isAvailable and soldAt are denormalized for the
+// older queries that pre-date listingStatus.
+function syncStatusFields(
+  data: Record<string, unknown>,
+  prev?: Pick<Car, "listingStatus" | "isAvailable">,
+): Record<string, unknown> {
+  const result = { ...data };
+  const nextStatus = result.listingStatus as Car["listingStatus"] | undefined;
+
+  // 1) listingStatus changed → derive isAvailable + soldAt
+  if (nextStatus !== undefined) {
+    const wasAvailable = prev?.isAvailable ?? false;
+    const willBeAvailable = nextStatus === "available";
+    result.isAvailable = willBeAvailable;
+
+    if (nextStatus === "sold" && (!prev || prev.listingStatus !== "sold")) {
+      result.soldAt = new Date();
+    } else if (nextStatus !== "sold" && prev?.listingStatus === "sold") {
+      result.soldAt = null;
+    }
+
+    // Cars going to upcoming/archived shouldn't carry an eta from a previous
+    // sold/available run — leave eta only meaningful for upcoming.
+    if (nextStatus !== "upcoming") {
+      result.transitStage = result.transitStage ?? null;
+      // eta intentionally not cleared — admin may want to keep it as a record.
+    }
+
+    // Track admin flipping availability via the legacy isAvailable boolean.
+    void wasAvailable;
+  }
+  // 2) isAvailable changed but no explicit listingStatus → mirror it.
+  else if (typeof result.isAvailable === "boolean" && prev) {
+    if (result.isAvailable && prev.listingStatus !== "available") {
+      result.listingStatus = "available";
+      result.soldAt = null;
+    } else if (!result.isAvailable && prev.listingStatus === "available") {
+      result.listingStatus = "sold";
+      result.soldAt = new Date();
+    }
+  }
+
   return result;
 }
 
@@ -55,7 +119,8 @@ function tryDecrypt(value: string): string {
 
 export const CarsService = {
   async create(data: CarCreateInput, userId: string): Promise<Car> {
-    const encrypted = encryptInput(data as Record<string, unknown>);
+    const synced = syncStatusFields(data as Record<string, unknown>);
+    const encrypted = encryptInput(synced);
     const car = await prisma.car.create({ data: encrypted as Prisma.CarUncheckedCreateInput });
     await prisma.auditLog.create({
       data: {
@@ -97,6 +162,61 @@ export const CarsService = {
     if (rest.carLocation) where.carLocation = rest.carLocation as Prisma.EnumCarLocationStatusFilter;
     if (rest.responsiblePerson) where.responsiblePerson = rest.responsiblePerson;
 
+    // Extended filters
+    if (rest.bodyType) where.bodyType = rest.bodyType as Prisma.EnumBodyTypeFilter;
+    if (rest.engineType) where.engineType = rest.engineType as Prisma.EnumEngineTypeFilter;
+    if (rest.gearboxType) where.gearboxType = rest.gearboxType as Prisma.EnumGearboxTypeFilter;
+    if (rest.drivetrain) {
+      // Treat awd and four_wd as equivalent — practically users don't distinguish
+      // "AWD" from "4WD" when filtering. Strict match is still possible by passing
+      // a value the catalog doesn't share (e.g. "fwd" vs "rwd").
+      if (rest.drivetrain === "awd" || rest.drivetrain === "four_wd") {
+        where.drivetrain = { in: ["awd", "four_wd"] };
+      } else {
+        where.drivetrain = rest.drivetrain as Prisma.EnumDrivetrainFilter;
+      }
+    }
+    if (rest.cabinType) where.cabinType = rest.cabinType as Prisma.EnumCabinTypeFilter;
+    if (rest.customsStatus) where.customsStatus = rest.customsStatus as Prisma.EnumCustomsStatusFilter;
+    if (rest.sellType) where.sellType = rest.sellType as Prisma.EnumSellTypeFilter;
+    if (rest.isCryptoAvailable !== undefined) where.isCryptoAvailable = rest.isCryptoAvailable;
+    if (rest.yearMin !== undefined || rest.yearMax !== undefined) {
+      where.year = {
+        ...(rest.yearMin !== undefined ? { gte: rest.yearMin } : {}),
+        ...(rest.yearMax !== undefined ? { lte: rest.yearMax } : {}),
+      };
+    }
+    if (rest.enginePowerMin !== undefined || rest.enginePowerMax !== undefined) {
+      where.enginePower = {
+        ...(rest.enginePowerMin !== undefined ? { gte: rest.enginePowerMin } : {}),
+        ...(rest.enginePowerMax !== undefined ? { lte: rest.enginePowerMax } : {}),
+      };
+    }
+    if (rest.engineVolumeMin !== undefined || rest.engineVolumeMax !== undefined) {
+      where.engineVolume = {
+        ...(rest.engineVolumeMin !== undefined ? { gte: rest.engineVolumeMin } : {}),
+        ...(rest.engineVolumeMax !== undefined ? { lte: rest.engineVolumeMax } : {}),
+      };
+    }
+    if (rest.seatsMin !== undefined || rest.seatsMax !== undefined) {
+      where.seatsCount = {
+        ...(rest.seatsMin !== undefined ? { gte: rest.seatsMin } : {}),
+        ...(rest.seatsMax !== undefined ? { lte: rest.seatsMax } : {}),
+      };
+    }
+    // Free-text — ILIKE across the public-visible columns. Cheap and fine at
+    // small catalog sizes; revisit with a tsvector + GIN index if dataset grows.
+    if (rest.q) {
+      const like = { contains: rest.q, mode: "insensitive" as const };
+      where.OR = [
+        { brand: like },
+        { model: like },
+        { color: like },
+        { shortDescription: like },
+        { description: like },
+      ];
+    }
+
     const [data, total] = await Promise.all([
       prisma.car.findMany({
         where,
@@ -116,7 +236,8 @@ export const CarsService = {
 
     const priceFields = ["ownerPrice", "websitePrice", "dealerPrice", "generalPrice"];
     const touchesPrice = priceFields.some((f) => f in data);
-    const encrypted = encryptInput(data as Record<string, unknown>);
+    const synced = syncStatusFields(data as Record<string, unknown>, before);
+    const encrypted = encryptInput(synced);
 
     const updated = await prisma.car.update({
       where: { id },
@@ -162,7 +283,26 @@ export const CarsService = {
 
   async setAvailability(id: number, isAvailable: boolean, userId: string): Promise<Car> {
     const before = await prisma.car.findUnique({ where: { id } });
-    const updated = await prisma.car.update({ where: { id }, data: { isAvailable } });
+    // Track sold-at on the true→false transition; clear on re-listing. Also
+    // mirror into listingStatus so the lifecycle field stays in sync.
+    let soldAtUpdate: Prisma.CarUpdateInput["soldAt"] | undefined;
+    let listingStatusUpdate: Prisma.CarUpdateInput["listingStatus"] | undefined;
+    if (before && before.isAvailable && !isAvailable) {
+      soldAtUpdate = new Date();
+      listingStatusUpdate = "sold";
+    } else if (before && !before.isAvailable && isAvailable) {
+      soldAtUpdate = null;
+      listingStatusUpdate = "available";
+    }
+
+    const updated = await prisma.car.update({
+      where: { id },
+      data: {
+        isAvailable,
+        ...(soldAtUpdate !== undefined ? { soldAt: soldAtUpdate } : {}),
+        ...(listingStatusUpdate !== undefined ? { listingStatus: listingStatusUpdate } : {}),
+      },
+    });
     await prisma.auditLog.create({
       data: {
         userId,

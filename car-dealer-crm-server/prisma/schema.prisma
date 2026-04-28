@@ -81,6 +81,26 @@ enum CarLocationStatus {
   dealership
 }
 
+// High-level lifecycle status used by the public site to bucket cars into
+// /upcoming, /cars, and the recently-sold strip. `isAvailable` is kept in
+// sync (true ⇔ status==available) for backward compatibility with existing
+// queries; once all consumers move to listingStatus we can drop isAvailable.
+enum ListingStatus {
+  upcoming   // ordered or in transit; not yet for sale
+  available  // for sale right now (the default)
+  sold       // sold; soldAt is set
+  archived   // hidden from public listings (admin-only)
+}
+
+// Pre-arrival logistics state. Values map to typical dealership workflow.
+enum TransitStage {
+  ordered
+  in_transit
+  at_port
+  customs
+  ready
+}
+
 model Car {
   id                   Int               @id @default(autoincrement())
 
@@ -122,6 +142,14 @@ model Car {
   dealerPrice          Decimal           @db.Decimal(12, 2) // price for dealers
   generalPrice         Decimal           @db.Decimal(12, 2) // base/internal price
   isAvailable          Boolean           @default(true)
+  soldAt               DateTime?         // set when isAvailable flips true→false; cleared on re-listing
+
+  // Lifecycle (upcoming / available / sold / archived). Defaults to available
+  // so existing rows keep behaving as before.
+  listingStatus        ListingStatus     @default(available)
+  eta                  DateTime?         // expected arrival; meaningful only when listingStatus=upcoming
+  transitStage         TransitStage?     // current logistics step; null for non-upcoming cars
+  estimatedPrice       Decimal?          @db.Decimal(12, 2) // tentative price while in transit
 
   // Public-facing copy
   shortDescription     String?           // one-liner shown on cards / OG description

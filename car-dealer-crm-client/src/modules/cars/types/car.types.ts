@@ -31,6 +31,11 @@ export interface Car {
   responsiblePerson: string;
   shortDescription: string | null;
   description: string | null;
+  // Lifecycle / upcoming
+  listingStatus: "upcoming" | "available" | "sold" | "archived";
+  eta: string | null;
+  transitStage: "ordered" | "in_transit" | "at_port" | "customs" | "ready" | null;
+  estimatedPrice: number | null;
   accidentFree: boolean;
   crashed: boolean;
   airbagReplaced: boolean;
@@ -55,6 +60,22 @@ export interface CarFilters {
   carOrigin?: string;
   carLocation?: string;
   isAvailable?: string; // "true" | "false" | "" (all)
+  // Extended filters
+  bodyType?: string;
+  engineType?: string;
+  gearboxType?: string;
+  drivetrain?: string;
+  cabinType?: string;
+  customsStatus?: string;
+  sellType?: string;
+  yearMin?: string;
+  yearMax?: string;
+  enginePowerMin?: string;
+  enginePowerMax?: string;
+  engineVolumeMin?: string;
+  engineVolumeMax?: string;
+  isCryptoAvailable?: string; // "true" | "false" | ""
+  q?: string;
 }
 
 export interface CarPhotoArchive {

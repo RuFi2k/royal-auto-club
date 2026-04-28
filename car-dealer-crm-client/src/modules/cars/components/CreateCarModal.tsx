@@ -47,6 +47,10 @@ const DEFAULTS: FormData = {
   generalPrice: 0,
   isAvailable: true,
   responsiblePerson: "",
+  listingStatus: "available",
+  eta: null,
+  transitStage: null,
+  estimatedPrice: null,
   shortDescription: null,
   description: null,
   photoUrl: null,
@@ -76,6 +80,8 @@ function carToForm(car: Car): FormData {
     carLocation: car.carLocation, location: car.location, sellType: car.sellType,
     isCryptoAvailable: car.isCryptoAvailable, isAvailable: car.isAvailable,
     responsiblePerson: car.responsiblePerson,
+    listingStatus: car.listingStatus, eta: car.eta, transitStage: car.transitStage,
+    estimatedPrice: car.estimatedPrice,
     shortDescription: car.shortDescription, description: car.description,
     photoUrl: car.photoUrl, techPassportUrl: car.techPassportUrl, defectsCheckUrl: car.defectsCheckUrl,
     accidentFree: car.accidentFree, crashed: car.crashed, airbagReplaced: car.airbagReplaced,
@@ -471,6 +477,72 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
                 onChange={(html) => set("description", html)}
                 placeholder="Розкажіть історію автомобіля: комплектація, обслуговування, особливі деталі…"
               />
+            </div>
+          </section>
+
+          <section className="form-section">
+            <h3>Статус оголошення</h3>
+            <div className="form-grid">
+              <div className="form-field">
+                <label>Статус *</label>
+                <select
+                  value={form.listingStatus}
+                  onChange={(e) => {
+                    const next = e.target.value as FormData["listingStatus"];
+                    setForm((prev) => ({
+                      ...prev,
+                      listingStatus: next,
+                      // Mirror the legacy isAvailable boolean and clear
+                      // upcoming-only fields when leaving that state.
+                      isAvailable: next === "available",
+                      ...(next !== "upcoming" ? { transitStage: null } : {}),
+                    }));
+                  }}
+                >
+                  <option value="upcoming">Очікується (в дорозі)</option>
+                  <option value="available">У наявності</option>
+                  <option value="sold">Продано</option>
+                  <option value="archived">Архів (приховано)</option>
+                </select>
+              </div>
+              {form.listingStatus === "upcoming" && (
+                <>
+                  <div className="form-field">
+                    <label>Очікувана дата прибуття</label>
+                    <input
+                      type="date"
+                      value={form.eta ? form.eta.slice(0, 10) : ""}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        set("eta", v ? new Date(v).toISOString() : null);
+                      }}
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label>Етап логістики</label>
+                    <select
+                      value={form.transitStage ?? ""}
+                      onChange={(e) => set("transitStage", (e.target.value || null) as FormData["transitStage"])}
+                    >
+                      <option value="">—</option>
+                      <option value="ordered">Замовлено</option>
+                      <option value="in_transit">В дорозі</option>
+                      <option value="at_port">У порту</option>
+                      <option value="customs">Розмитнення</option>
+                      <option value="ready">Готове</option>
+                    </select>
+                  </div>
+                  <div className="form-field">
+                    <label>Орієнтовна ціна ($)</label>
+                    <input
+                      type="number"
+                      placeholder="напр. 71500"
+                      value={form.estimatedPrice ?? ""}
+                      onChange={(e) => set("estimatedPrice", e.target.value === "" ? null : Number(e.target.value))}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </section>
 
