@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { uploadCarFile, deleteCarFile } from "../services/storage";
+import { deleteCarFile } from "../services/storage";
 import {
   getCarPhotos,
   addCarPhoto,
   updateCarPhoto,
   reorderCarPhotos,
   deleteCarPhoto,
+  uploadOptimizedPhotos,
 } from "../services/photos.api";
 import type { Car, CarPhoto } from "../types/car.types";
 
@@ -35,10 +36,10 @@ export function PhotoGalleryModal({ car, onClose }: Props) {
     setUploading(true);
     setError(null);
     try {
+      const uploaded = await uploadOptimizedPhotos(selectedFiles);
       const added: CarPhoto[] = [];
-      for (const file of selectedFiles) {
-        const url = await uploadCarFile(file, "photos");
-        const photo = await addCarPhoto(car.id, { url, alt: file.name });
+      for (const item of uploaded) {
+        const photo = await addCarPhoto(car.id, { url: item.url, alt: item.originalName });
         added.push(photo);
       }
       setPhotos((prev) => [...prev, ...added]);
