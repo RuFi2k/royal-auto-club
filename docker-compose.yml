@@ -31,6 +31,9 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       ADMIN_EMAILS: ${ADMIN_EMAILS}
       PUBLIC_API_KEYS: ${PUBLIC_API_KEYS}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_CHANNEL_ID: ${TELEGRAM_CHANNEL_ID}
+      SITE_PUBLIC_URL: ${SITE_PUBLIC_URL}
     volumes:
       - ./backups:/app/backups
       - ./serviceAccount.json:/run/secrets/serviceAccount.json:ro
