@@ -1,6 +1,7 @@
 import { Car, Prisma } from "@prisma/client";
 import { prisma } from "../../db";
 import { encrypt, decrypt, hmac } from "../../lib/encryption";
+import { syncCarTelegramPost } from "../telegram/poster";
 
 export type CarCreateInput = Omit<Prisma.CarUncheckedCreateInput, "vinNumberHash">;
 export type CarUpdateInput = Omit<Prisma.CarUncheckedUpdateInput, "vinNumberHash">;
@@ -129,6 +130,8 @@ export const CarsService = {
         changedFields: { brand: car.brand, model: car.model, year: car.year } as object,
       },
     });
+    // Telegram post is synced from the router after photos are attached, so the
+    // initial sendMediaGroup carries the gallery instead of being a text post.
     return decryptCar(car);
   },
 
@@ -250,6 +253,7 @@ export const CarsService = {
       data: { userId, action: "UPDATE", carId: id, changedFields: changedFields as object },
     });
 
+    syncCarTelegramPost(id);
     return decryptedAfter;
   },
 
@@ -298,6 +302,7 @@ export const CarsService = {
         changedFields: { isAvailable: { from: before?.isAvailable, to: isAvailable } } as object,
       },
     });
+    syncCarTelegramPost(id);
     return decryptCar(updated);
   },
 
