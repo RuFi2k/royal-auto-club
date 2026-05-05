@@ -1,13 +1,33 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { Prisma } from "@prisma/client";
+import multer from "multer";
 import { CarsService } from "./cars.service";
 import { prisma } from "../../db";
 import { requireAuth, AuthRequest } from "../../middleware/auth.middleware";
 import { sanitizeRichText } from "../../lib/sanitize-html";
+import { optimizeAndUpload } from "./photo-upload";
 
 export const carsRouter = Router();
 
 carsRouter.use(requireAuth);
+
+const photoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024, files: 30 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) cb(null, true);
+    else cb(new Error("Only image files are allowed"));
+  },
+});
+
+// Wraps multer middleware so its errors (file too large, non-image, etc.) become 400
+// instead of falling through to the global 500 handler.
+function uploadMiddleware(req: Request, res: Response, next: NextFunction) {
+  photoUpload.array("files", 30)(req, res, (err) => {
+    if (err) { res.status(400).json({ message: err.message ?? "Upload failed" }); return; }
+    next();
+  });
+}
 
 function uid(req: Request): string {
   return (req as AuthRequest).uid;
@@ -34,6 +54,18 @@ function a(fn: (req: Request, res: Response) => Promise<void>) {
       next(err);
     });
 }
+
+// POST /cars/upload-photos — multipart upload, optimizes each image to WebP and uploads to Firebase.
+// Returns URLs the client then attaches to a car (via createCar payload or POST /:id/photos).
+// MUST be before /:id to avoid "upload-photos" matching as an id.
+carsRouter.post("/upload-photos", uploadMiddleware, a(async (req, res) => {
+  const files = (req.files ?? []) as Express.Multer.File[];
+  if (files.length === 0) { res.status(400).json({ message: "No files" }); return; }
+  const results = await Promise.all(
+    files.map((f) => optimizeAndUpload(f.buffer, f.originalname))
+  );
+  res.json(results);
+}));
 
 // GET /cars/audit-logs — MUST be before /:id to avoid "audit-logs" matching as an id
 carsRouter.get("/audit-logs", a(async (req, res) => {

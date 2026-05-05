@@ -55,3 +55,23 @@ export async function deleteCarPhoto(carId: number, photoId: number): Promise<vo
   });
   if (!res.ok) throw new Error("Не вдалося видалити фото");
 }
+
+export interface OptimizedUpload {
+  url: string;
+  originalName: string;
+  originalSize: number;
+  optimizedSize: number;
+}
+
+export async function uploadOptimizedPhotos(files: File[]): Promise<OptimizedUpload[]> {
+  if (files.length === 0) return [];
+  const fd = new FormData();
+  for (const f of files) fd.append("files", f);
+  const res = await fetch(`${API_URL}/cars/upload-photos`, {
+    method: "POST",
+    headers: await authHeadersNoContentType(),
+    body: fd,
+  });
+  if (!res.ok) throw new Error("Не вдалося завантажити фото");
+  return res.json();
+}

@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: devpass
       POSTGRES_DB: car_dealer_crm
     ports:
-      - "5433:5432"
+      - "5434:5432"
     volumes:
       - pgdata-local:/var/lib/postgresql/data
     healthcheck:
@@ -41,7 +41,10 @@ services:
       PORT: "3000"
       CORS_ORIGIN: http://localhost:5173
       FIREBASE_PROJECT_ID: demo-crm
+      FIREBASE_STORAGE_BUCKET: demo-crm.appspot.com
       FIREBASE_AUTH_EMULATOR_HOST: firebase:9099
+      FIREBASE_STORAGE_EMULATOR_HOST: firebase:9199
+      PUBLIC_STORAGE_EMULATOR_HOST: localhost:9199
       ENCRYPTION_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
       ADMIN_EMAILS: admin@royalautoclub.local
       PUBLIC_API_KEYS: dev-site-key-please-rotate

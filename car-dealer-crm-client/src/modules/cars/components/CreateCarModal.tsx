@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createCar, updateCar } from "../services/cars.api";
 import { uploadCarFile } from "../services/storage";
+import { uploadOptimizedPhotos } from "../services/photos.api";
 import type { Car } from "../types/car.types";
 import { CRASH_BODY_PARTS, CRASH_BODY_PART_LABELS } from "../lib/crash-body-parts";
 import { PhotoGalleryModal } from "./PhotoGalleryModal";
@@ -183,12 +184,12 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
         }
         saved = await updateCar(car.id, changes);
       } else {
-        // CREATE mode — upload staged gallery photos, then POST with photos[]
-        const uploadedPhotos: Array<{ url: string; alt: string | null }> = [];
-        for (const p of stagedPhotos) {
-          const url = await uploadCarFile(p.file, "photos");
-          uploadedPhotos.push({ url, alt: p.alt || null });
-        }
+        // CREATE mode — upload staged gallery photos via the optimizing endpoint, then POST with photos[]
+        const uploaded = await uploadOptimizedPhotos(stagedPhotos.map((p) => p.file));
+        const uploadedPhotos = uploaded.map((item, i) => ({
+          url: item.url,
+          alt: stagedPhotos[i]?.alt || null,
+        }));
         const payload: any = { ...formWithFiles };
         if (uploadedPhotos.length > 0) payload.photos = uploadedPhotos;
         saved = await createCar(payload);
