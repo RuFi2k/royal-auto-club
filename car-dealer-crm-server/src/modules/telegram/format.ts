@@ -117,7 +117,6 @@ export function buildCarCaption(
   ].filter(Boolean);
 
   const priceLine = `💰 ${formatPrice(car.websitePrice)}`;
-  const vinLine = car.vinNumber ? `🔍 VIN: <code>${escapeHtml(car.vinNumber)}</code>` : "";
   const linkLines = url
     ? [`ℹ️ Повна інформація на сайті:`, url]
     : [];
@@ -130,8 +129,6 @@ export function buildCarCaption(
     specLines.join("\n"),
     "",
     priceLine,
-    vinLine ? "" : null,
-    vinLine,
     linkLines.length ? "" : null,
     ...linkLines,
   ]
