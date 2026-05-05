@@ -176,6 +176,11 @@ model Car {
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 
+  // Telegram channel auto-poster — first message id of the sendMediaGroup post
+  // for this car. Used to edit caption on subsequent updates / status changes.
+  // null when never posted (e.g. archived from creation, or before this feature).
+  telegramMessageId    Int?
+
   @@map("cars")
   @@index([listingStatus])
   @@index([listingStatus, createdAt(sort: Desc)])

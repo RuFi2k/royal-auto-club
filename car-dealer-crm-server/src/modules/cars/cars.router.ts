@@ -6,6 +6,7 @@ import { prisma } from "../../db";
 import { requireAuth, AuthRequest } from "../../middleware/auth.middleware";
 import { sanitizeRichText } from "../../lib/sanitize-html";
 import { optimizeAndUpload } from "./photo-upload";
+import { syncCarTelegramPost } from "../telegram/poster";
 
 export const carsRouter = Router();
 
@@ -156,6 +157,7 @@ carsRouter.post("/", a(async (req, res) => {
     where: { id: car.id },
     include: { photos: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] } },
   });
+  syncCarTelegramPost(car.id);
   res.status(201).json(withPhotos ?? car);
 }));
 
@@ -211,6 +213,7 @@ carsRouter.post("/:id/photos", a(async (req, res) => {
   const photo = await prisma.carPhoto.create({
     data: { carId, url, alt: alt ?? null, sortOrder: next },
   });
+  syncCarTelegramPost(carId);
   res.status(201).json(photo);
 }));
 
@@ -227,6 +230,7 @@ carsRouter.patch("/:id/photos/:photoId", a(async (req, res) => {
       ...(sortOrder !== undefined ? { sortOrder } : {}),
     },
   });
+  syncCarTelegramPost(carId);
   res.json(photo);
 }));
 
@@ -245,6 +249,7 @@ carsRouter.put("/:id/photos/order", a(async (req, res) => {
     where: { carId },
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
   });
+  syncCarTelegramPost(carId);
   res.json(photos);
 }));
 
@@ -254,6 +259,7 @@ carsRouter.delete("/:id/photos/:photoId", a(async (req, res) => {
   const photoId = parseInt(req.params.photoId as string, 10);
   if (isNaN(carId) || isNaN(photoId)) { res.status(400).json({ message: "Invalid id" }); return; }
   await prisma.carPhoto.delete({ where: { id: photoId, carId } });
+  syncCarTelegramPost(carId);
   res.status(204).send();
 }));
 
