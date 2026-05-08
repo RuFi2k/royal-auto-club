@@ -99,7 +99,14 @@ export function buildCarCaption(
   opts: { siteUrl: string; descriptionBudget?: number } = { siteUrl: "" },
 ): string {
   const siteUrl = opts.siteUrl.replace(/\/+$/, "");
-  const url = siteUrl ? `${siteUrl}/ua/cars/${car.id}` : "";
+  const isSold = car.listingStatus === "sold";
+  // Sold cars get a CTA to the inventory page instead of their own (now stale)
+  // detail page + dealer phone, so the channel keeps driving traffic to live cars.
+  const url = siteUrl
+    ? isSold
+      ? `${siteUrl}/ua/cars`
+      : `${siteUrl}/ua/cars/${car.id}`
+    : "";
 
   const header = STATUS_HEADER[car.listingStatus] ?? "";
   const bodyTypeUa = BODY_TYPE_UA[car.bodyType] ?? car.bodyType;
@@ -124,7 +131,9 @@ export function buildCarCaption(
 
   const priceLine = `💰 ${formatPrice(car.websitePrice)}`;
   const linkLines = url
-    ? [`ℹ️ Повна інформація на сайті:`, url]
+    ? isSold
+      ? [`ℹ️ Більше авто на нашому сайті:`, url]
+      : [`ℹ️ Повна інформація на сайті:`, url]
     : [];
 
   const fixed = [
@@ -135,8 +144,8 @@ export function buildCarCaption(
     specLines.join("\n"),
     "",
     priceLine,
-    "",
-    phoneLine,
+    isSold ? null : "",
+    isSold ? null : phoneLine,
     linkLines.length ? "" : null,
     ...linkLines,
   ]
