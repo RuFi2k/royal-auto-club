@@ -88,6 +88,12 @@ function stripHtml(s: string | null | undefined): string {
 // Telegram caption limit: 1024 chars (sendMediaGroup, editMessageCaption).
 const CAPTION_MAX = 1024;
 
+// Public sales contact shown in every channel post. Uses <a href="tel:…"> so
+// mobile clients open the dialer on tap.
+const CONTACT_PHONE_E164 = "+380689807548";
+const CONTACT_PHONE_DISPLAY = "+380 68 980 75 48";
+const phoneLine = `📞 <a href="tel:${CONTACT_PHONE_E164}">${CONTACT_PHONE_DISPLAY}</a>`;
+
 export function buildCarCaption(
   car: Car,
   opts: { siteUrl: string; descriptionBudget?: number } = { siteUrl: "" },
@@ -129,6 +135,8 @@ export function buildCarCaption(
     specLines.join("\n"),
     "",
     priceLine,
+    "",
+    phoneLine,
     linkLines.length ? "" : null,
     ...linkLines,
   ]
