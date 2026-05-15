@@ -10,7 +10,9 @@
       "Bash(cmd /c \"where pg_dump\")",
       "Bash(cmd /c \"dir \"\"C:\\\\Program Files\\\\PostgreSQL\"\" /b\")",
       "Bash(npx tsc:*)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(cat .env)",
+      "Bash(cat .env.example)"
     ]
   }
 }
