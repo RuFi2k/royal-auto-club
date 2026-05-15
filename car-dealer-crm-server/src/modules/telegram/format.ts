@@ -90,8 +90,8 @@ const CAPTION_MAX = 1024;
 
 // Public sales contact shown in every channel post. Uses <a href="tel:…"> so
 // mobile clients open the dialer on tap.
-const CONTACT_PHONE_E164 = "+380689807548";
-const CONTACT_PHONE_DISPLAY = "+380 68 980 75 48";
+const CONTACT_PHONE_E164 = "+380772277775";
+const CONTACT_PHONE_DISPLAY = "+380 (77) 227 77 75";
 const phoneLine = `📞 <a href="tel:${CONTACT_PHONE_E164}">${CONTACT_PHONE_DISPLAY}</a>`;
 
 export function buildCarCaption(
