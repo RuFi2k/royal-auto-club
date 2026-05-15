@@ -161,6 +161,10 @@ export function CarsPage() {
           car={viewingCar}
           onClose={() => setViewingCar(null)}
           onEdit={(car) => { setViewingCar(null); setEditingCar(car); }}
+          onUpdated={(updated) => {
+            setViewingCar(updated);
+            setCars((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+          }}
         />
       )}
 

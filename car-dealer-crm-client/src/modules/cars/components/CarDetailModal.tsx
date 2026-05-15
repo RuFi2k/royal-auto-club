@@ -1,10 +1,13 @@
+import { useState } from "react";
 import type { Car } from "../types/car.types";
 import { CRASH_BODY_PART_LABELS } from "../lib/crash-body-parts";
+import { publishCarToTelegram, deleteCarTelegramPost } from "../services/cars.api";
 
 interface Props {
   car: Car;
   onClose: () => void;
   onEdit: (car: Car) => void;
+  onUpdated?: (car: Car) => void;
 }
 
 function fmt(value: number) {
@@ -57,7 +60,44 @@ function Field({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-export function CarDetailModal({ car, onClose, onEdit }: Props) {
+export function CarDetailModal({ car, onClose, onEdit, onUpdated }: Props) {
+  const [tgBusy, setTgBusy] = useState<"publish" | "delete" | null>(null);
+  const [tgError, setTgError] = useState<string | null>(null);
+  const isArchived = car.listingStatus === "archived";
+
+  async function handlePublish() {
+    if (isArchived) return;
+    if (car.telegramMessageId) {
+      const ok = window.confirm("Перепублікувати пост у Telegram?\nСтарий пост буде видалено, новий — створено.");
+      if (!ok) return;
+    }
+    setTgError(null);
+    setTgBusy("publish");
+    try {
+      const { messageId } = await publishCarToTelegram(car.id);
+      onUpdated?.({ ...car, telegramMessageId: messageId });
+    } catch (err: any) {
+      setTgError(err.message ?? "Не вдалося опублікувати");
+    } finally {
+      setTgBusy(null);
+    }
+  }
+
+  async function handleDeletePost() {
+    const ok = window.confirm("Видалити пост у Telegram?");
+    if (!ok) return;
+    setTgError(null);
+    setTgBusy("delete");
+    try {
+      await deleteCarTelegramPost(car.id);
+      onUpdated?.({ ...car, telegramMessageId: null });
+    } catch (err: any) {
+      setTgError(err.message ?? "Не вдалося видалити");
+    } finally {
+      setTgBusy(null);
+    }
+  }
+
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal modal-detail">
@@ -315,9 +355,38 @@ export function CarDetailModal({ car, onClose, onEdit }: Props) {
 
         </div>
 
-        <div className="modal-footer">
-          <button className="filter-reset" onClick={onClose}>Закрити</button>
-          <button className="btn-search" onClick={() => { onClose(); onEdit(car); }}>Редагувати</button>
+        <div className="modal-footer detail-footer">
+          <div className="detail-footer-telegram">
+            <span className="detail-tg-status">
+              Telegram: {car.telegramMessageId
+                ? <strong>опубліковано #{car.telegramMessageId}</strong>
+                : <strong>не опубліковано</strong>}
+            </span>
+            <button
+              className="filter-reset"
+              onClick={handlePublish}
+              disabled={tgBusy !== null || isArchived}
+              title={isArchived ? "Архівні авто не публікуються в Telegram" : ""}
+            >
+              {tgBusy === "publish"
+                ? "..."
+                : car.telegramMessageId ? "Перепостити в Telegram" : "Опублікувати в Telegram"}
+            </button>
+            {car.telegramMessageId && (
+              <button
+                className="filter-reset"
+                onClick={handleDeletePost}
+                disabled={tgBusy !== null}
+              >
+                {tgBusy === "delete" ? "..." : "Видалити пост"}
+              </button>
+            )}
+            {tgError && <span className="detail-tg-error">{tgError}</span>}
+          </div>
+          <div className="detail-footer-actions">
+            <button className="filter-reset" onClick={onClose}>Закрити</button>
+            <button className="btn-search" onClick={() => { onClose(); onEdit(car); }}>Редагувати</button>
+          </div>
         </div>
       </div>
     </div>

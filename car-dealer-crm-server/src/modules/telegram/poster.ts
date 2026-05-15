@@ -34,6 +34,54 @@ export function syncCarTelegramPost(carId: number): void {
   });
 }
 
+// Explicit republish: delete existing post (if any) and create a fresh one.
+// Used by the CRM "Publish / Republish" button so admins can refresh photos.
+export async function republishCarTelegramPost(carId: number): Promise<{ messageId: number | null }> {
+  const cfg = config();
+  if (!cfg) throw new Error("Telegram not configured");
+
+  const car = await prisma.car.findUnique({
+    where: { id: carId },
+    include: { photos: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] } },
+  });
+  if (!car) throw new Error("Car not found");
+  if (car.listingStatus === "archived") throw new Error("Архівні авто не публікуються в Telegram");
+
+  if (car.telegramMessageId) {
+    await deleteMessage(cfg.token, cfg.chatId, car.telegramMessageId);
+    await prisma.car.update({ where: { id: car.id }, data: { telegramMessageId: null } });
+  }
+
+  const caption = buildCarCaption(car, { siteUrl: cfg.siteUrl });
+  const photoUrls = pickPhotoUrls(car.photos, car.photoUrl);
+  const messageId = await createPost(cfg.token, cfg.chatId, caption, photoUrls);
+  if (messageId !== null) {
+    await prisma.car.update({ where: { id: car.id }, data: { telegramMessageId: messageId } });
+  }
+  return { messageId };
+}
+
+// Delete a car's Telegram post and clear the stored message id.
+export async function deleteCarTelegramPost(carId: number): Promise<void> {
+  const cfg = config();
+  if (!cfg) throw new Error("Telegram not configured");
+
+  const car = await prisma.car.findUnique({ where: { id: carId } });
+  if (!car) throw new Error("Car not found");
+  if (!car.telegramMessageId) return;
+
+  await deleteMessage(cfg.token, cfg.chatId, car.telegramMessageId);
+  await prisma.car.update({ where: { id: car.id }, data: { telegramMessageId: null } });
+}
+
+async function deleteMessage(token: string, chatId: string, messageId: number): Promise<void> {
+  const r = await tgCall<true>(token, "deleteMessage", { chat_id: chatId, message_id: messageId });
+  // "message to delete not found" — treat as already gone, don't error.
+  if (!r.ok && !/not found/i.test(r.description)) {
+    console.error(`[telegram] deleteMessage failed: ${r.description}`);
+  }
+}
+
 async function runSync(carId: number): Promise<void> {
   const cfg = config();
   if (!cfg) return; // disabled silently when env not set
