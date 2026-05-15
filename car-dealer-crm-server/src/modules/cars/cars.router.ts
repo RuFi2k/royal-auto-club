@@ -6,7 +6,7 @@ import { prisma } from "../../db";
 import { requireAuth, AuthRequest } from "../../middleware/auth.middleware";
 import { sanitizeRichText } from "../../lib/sanitize-html";
 import { optimizeAndUpload } from "./photo-upload";
-import { syncCarTelegramPost } from "../telegram/poster";
+import { syncCarTelegramPost, republishCarTelegramPost, deleteCarTelegramPost } from "../telegram/poster";
 
 export const carsRouter = Router();
 
@@ -188,6 +188,32 @@ carsRouter.delete("/:id", a(async (req, res) => {
   if (isNaN(id)) { res.status(400).json({ message: "Invalid id" }); return; }
   await CarsService.delete(id, uid(req));
   res.status(204).send();
+}));
+
+// POST /cars/:id/telegram/publish — create or recreate the Telegram post
+carsRouter.post("/:id/telegram/publish", a(async (req, res) => {
+  const id = parseInt(req.params.id as string, 10);
+  if (isNaN(id)) { res.status(400).json({ message: "Invalid id" }); return; }
+  try {
+    const result = await republishCarTelegramPost(id);
+    res.json(result);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Telegram publish failed";
+    res.status(400).json({ message: msg });
+  }
+}));
+
+// DELETE /cars/:id/telegram — delete the Telegram post and clear the stored id
+carsRouter.delete("/:id/telegram", a(async (req, res) => {
+  const id = parseInt(req.params.id as string, 10);
+  if (isNaN(id)) { res.status(400).json({ message: "Invalid id" }); return; }
+  try {
+    await deleteCarTelegramPost(id);
+    res.status(204).send();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Telegram delete failed";
+    res.status(400).json({ message: msg });
+  }
 }));
 
 // GET /cars/:id/photos — gallery, sorted by sortOrder asc

@@ -52,6 +52,29 @@ export async function deleteCar(id: number): Promise<void> {
   if (!res.ok) throw new Error(`Помилка видалення: ${res.statusText}`);
 }
 
+export async function publishCarToTelegram(id: number): Promise<{ messageId: number | null }> {
+  const res = await fetch(`${API_URL}/cars/${id}/telegram/publish`, {
+    method: "POST",
+    headers: await authHeaders(),
+  });
+  if (!res.ok) {
+    const msg = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(msg.message ?? "Помилка публікації в Telegram");
+  }
+  return res.json();
+}
+
+export async function deleteCarTelegramPost(id: number): Promise<void> {
+  const res = await fetch(`${API_URL}/cars/${id}/telegram`, {
+    method: "DELETE",
+    headers: await authHeadersNoContentType(),
+  });
+  if (!res.ok) {
+    const msg = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(msg.message ?? "Помилка видалення з Telegram");
+  }
+}
+
 export async function setCarAvailability(id: number, isAvailable: boolean): Promise<Car> {
   const res = await fetch(`${API_URL}/cars/${id}/availability`, {
     method: "PATCH",
