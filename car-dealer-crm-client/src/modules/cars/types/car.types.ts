@@ -45,7 +45,7 @@ export interface Car {
   techPassportUrl: string | null;
   defectsCheckUrl: string | null;
   priceChangedAt: string | null;
-  telegramMessageId: number | null;
+  telegramMessageId?: number | null;
   createdAt: string;
   updatedAt: string;
 }
