@@ -42,4 +42,4 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           npm install -g vercel
-          vercel deploy --prod --token=$VERCEL_TOKEN --yes car-dealer-crm-client
+          vercel deploy --prod --token=$VERCEL_TOKEN --yes
