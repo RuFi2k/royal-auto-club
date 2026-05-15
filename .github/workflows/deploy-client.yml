@@ -36,11 +36,10 @@ jobs:
         run: npm run build
 
       - name: Deploy to Vercel
-        working-directory: car-dealer-crm-client
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           npm install -g vercel
-          vercel deploy --prod --token=$VERCEL_TOKEN --yes
+          vercel deploy --prod --token=$VERCEL_TOKEN --yes car-dealer-crm-client
