@@ -450,12 +450,6 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
                 <label>Відповідальна особа *</label>
                 <input required value={form.responsiblePerson} onChange={(e) => set("responsiblePerson", e.target.value)} placeholder="Email або ім'я" />
               </div>
-              <div className="form-field form-field-checkbox">
-                <label>
-                  <input type="checkbox" checked={form.isAvailable} onChange={(e) => set("isAvailable", e.target.checked)} />
-                  Доступний для купівлі
-                </label>
-              </div>
             </div>
           </section>
 

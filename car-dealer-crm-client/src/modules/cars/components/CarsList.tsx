@@ -69,6 +69,13 @@ const CUSTOMS: Record<string, string> = {
   in_progress: "В процесі",
 };
 
+const LISTING_STATUS: Record<Car["listingStatus"], { label: string; cls: string }> = {
+  available: { label: "Наявний", cls: "badge-available" },
+  upcoming: { label: "Очікується", cls: "badge-upcoming" },
+  sold: { label: "Продано", cls: "badge-unavailable" },
+  archived: { label: "Архів", cls: "badge-unavailable" },
+};
+
 function NoPhotoIcon() {
   return (
     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#cbd5e0" strokeWidth="1.5">
@@ -108,8 +115,8 @@ export function CarsList({ cars, loading, onView, onEdit, onToggleAvailability, 
                 <span className="car-row-id">#{car.id}</span>
               </div>
               <div className="car-row-actions">
-                <span className={`badge ${car.isAvailable ? "badge-available" : "badge-unavailable"}`}>
-                  {car.isAvailable ? "Наявний" : "Продано"}
+                <span className={`badge ${LISTING_STATUS[car.listingStatus]?.cls ?? "badge-unavailable"}`}>
+                  {LISTING_STATUS[car.listingStatus]?.label ?? car.listingStatus}
                 </span>
                 <button className="action-btn action-view" onClick={() => onView(car)}>
                   Деталі
@@ -123,7 +130,7 @@ export function CarsList({ cars, loading, onView, onEdit, onToggleAvailability, 
                 <button className="action-btn action-archive" onClick={() => onManageArchives(car)}>
                   Архіви фото
                 </button>
-                {car.isAvailable && (
+                {car.listingStatus === "available" && (
                   <button className="action-btn action-sold" onClick={() => onToggleAvailability(car)}>
                     Продати
                   </button>
