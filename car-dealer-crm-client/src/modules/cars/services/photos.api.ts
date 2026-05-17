@@ -78,5 +78,10 @@ async function uploadSinglePhoto(file: File): Promise<OptimizedUpload> {
 
 export async function uploadOptimizedPhotos(files: File[]): Promise<OptimizedUpload[]> {
   if (files.length === 0) return [];
-  return Promise.all(files.map(uploadSinglePhoto));
+  const results: OptimizedUpload[] = [];
+  for (let i = 0; i < files.length; i += 3) {
+    const batch = await Promise.all(files.slice(i, i + 3).map(uploadSinglePhoto));
+    results.push(...batch);
+  }
+  return results;
 }
