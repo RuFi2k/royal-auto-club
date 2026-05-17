@@ -130,6 +130,7 @@ export function buildCarCaption(
   ].filter(Boolean);
 
   const priceLine = `💰 ${formatPrice(car.websitePrice)}`;
+  const offerLines = isSold ? [] : ["🤝 Торг | Обмін", "🏦 Кредит | Лізинг"];
   const linkLines = url
     ? isSold
       ? [`ℹ️ Більше авто на нашому сайті:`, url]
@@ -144,6 +145,8 @@ export function buildCarCaption(
     specLines.join("\n"),
     "",
     priceLine,
+    offerLines.length ? "" : null,
+    ...offerLines,
     isSold ? null : "",
     isSold ? null : phoneLine,
     linkLines.length ? "" : null,
