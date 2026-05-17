@@ -12,10 +12,21 @@ export interface OptimizedUpload {
   optimizedSize: number;
 }
 
+function isHeicBuffer(buffer: Buffer): boolean {
+  if (buffer.length < 12) return false;
+  if (buffer.toString("ascii", 4, 8) !== "ftyp") return false;
+  const brand = buffer.toString("ascii", 8, 12);
+  return ["heic", "heix", "hevc", "hevx", "mif1", "msf1"].includes(brand);
+}
+
 export async function optimizeAndUpload(
   buffer: Buffer,
   originalName: string,
 ): Promise<OptimizedUpload> {
+  if (isHeicBuffer(buffer)) {
+    throw Object.assign(new Error("HEIC/HEIF files must be converted to JPEG before uploading"), { statusCode: 415 });
+  }
+
   const optimized = await sharp(buffer)
     .rotate()
     .resize({

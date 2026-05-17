@@ -1,3 +1,4 @@
+import heic2any from "heic2any";
 import type { CarPhoto } from "../types/car.types";
 import { authHeaders, authHeadersNoContentType } from "./api.helpers";
 
@@ -63,15 +64,28 @@ export interface OptimizedUpload {
   optimizedSize: number;
 }
 
+async function toJpegIfHeic(file: File): Promise<File> {
+  const isHeic = file.type.includes("heic") || file.type.includes("heif") || /\.(heic|heif)$/i.test(file.name);
+  if (!isHeic) return file;
+  try {
+    const result = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+    const blob = Array.isArray(result) ? result[0] : result;
+    return new File([blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
+  } catch {
+    return file;
+  }
+}
+
 async function uploadSinglePhoto(file: File): Promise<OptimizedUpload> {
+  const normalized = await toJpegIfHeic(file);
   const fd = new FormData();
-  fd.append("files", file);
+  fd.append("files", normalized);
   const res = await fetch(`${API_URL}/cars/upload-photos`, {
     method: "POST",
     headers: await authHeadersNoContentType(),
     body: fd,
   });
-  if (!res.ok) throw new Error(`Не вдалося завантажити ${file.name}`);
+  if (!res.ok) throw new Error(`Не вдалося завантажити ${normalized.name}`);
   const results: OptimizedUpload[] = await res.json();
   return results[0];
 }

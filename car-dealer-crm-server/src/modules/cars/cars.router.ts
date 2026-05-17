@@ -64,8 +64,12 @@ carsRouter.post("/upload-photos", uploadMiddleware, a(async (req, res) => {
   if (files.length === 0) { res.status(400).json({ message: "No files" }); return; }
   const results = await Promise.all(
     files.map((f) => optimizeAndUpload(f.buffer, f.originalname))
-  );
-  res.json(results);
+  ).catch((err) => {
+    const status = (err as { statusCode?: number }).statusCode ?? 500;
+    res.status(status).json({ message: err.message ?? "Upload failed" });
+    return null;
+  });
+  if (results) res.json(results);
 }));
 
 // GET /cars/audit-logs — MUST be before /:id to avoid "audit-logs" matching as an id
