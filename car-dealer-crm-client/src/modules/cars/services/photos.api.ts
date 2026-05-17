@@ -65,12 +65,15 @@ export interface OptimizedUpload {
 }
 
 async function normalizeFile(file: File): Promise<File> {
-  if (!file.type.includes("heic") && !file.type.includes("heif") && file.name.match(/\.(heic|heif)$/i) === null) {
+  const isHeic = file.type.includes("heic") || file.type.includes("heif") || /\.(heic|heif)$/i.test(file.name);
+  if (!isHeic) return file;
+  try {
+    const jpeg = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+    const blob = Array.isArray(jpeg) ? jpeg[0] : jpeg;
+    return new File([blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
+  } catch {
     return file;
   }
-  const jpeg = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
-  const blob = Array.isArray(jpeg) ? jpeg[0] : jpeg;
-  return new File([blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
 }
 
 async function uploadSinglePhoto(file: File): Promise<OptimizedUpload> {
