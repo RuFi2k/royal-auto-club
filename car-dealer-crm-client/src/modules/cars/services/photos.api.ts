@@ -71,7 +71,8 @@ async function toJpegIfHeic(file: File): Promise<File> {
     const result = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
     const blob = Array.isArray(result) ? result[0] : result;
     return new File([blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
-  } catch {
+  } catch (err) {
+    console.error("[heic2any] conversion failed:", err);
     return file;
   }
 }
