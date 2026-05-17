@@ -25,7 +25,7 @@ export async function optimizeAndUpload(
   originalName: string,
 ): Promise<OptimizedUpload> {
   const inputBuffer = isHeic(buffer)
-    ? Buffer.from(await heicConvert({ buffer: buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer, format: "JPEG", quality: 0.9 }))
+    ? Buffer.from(await heicConvert({ buffer: buffer as unknown as ArrayBuffer, format: "JPEG", quality: 0.9 }))
     : buffer;
 
   const optimized = await sharp(inputBuffer)
