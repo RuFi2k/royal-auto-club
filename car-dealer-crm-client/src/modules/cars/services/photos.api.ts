@@ -63,15 +63,20 @@ export interface OptimizedUpload {
   optimizedSize: number;
 }
 
-export async function uploadOptimizedPhotos(files: File[]): Promise<OptimizedUpload[]> {
-  if (files.length === 0) return [];
+async function uploadSinglePhoto(file: File): Promise<OptimizedUpload> {
   const fd = new FormData();
-  for (const f of files) fd.append("files", f);
+  fd.append("files", file);
   const res = await fetch(`${API_URL}/cars/upload-photos`, {
     method: "POST",
     headers: await authHeadersNoContentType(),
     body: fd,
   });
-  if (!res.ok) throw new Error("Не вдалося завантажити фото");
-  return res.json();
+  if (!res.ok) throw new Error(`Не вдалося завантажити ${file.name}`);
+  const results: OptimizedUpload[] = await res.json();
+  return results[0];
+}
+
+export async function uploadOptimizedPhotos(files: File[]): Promise<OptimizedUpload[]> {
+  if (files.length === 0) return [];
+  return Promise.all(files.map(uploadSinglePhoto));
 }
