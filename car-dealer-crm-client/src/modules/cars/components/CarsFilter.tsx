@@ -87,7 +87,7 @@ export function CarsFilter({ filters, onChange }: Props) {
       </div>
 
       <div className="filter-field">
-        <label>Пробіг (км)</label>
+        <label>Пробіг (тис. км)</label>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <input
             type="number"

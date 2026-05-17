@@ -108,7 +108,7 @@ model Car {
   brand                String
   model                String
   year                 Int
-  mileage              Int               // km
+  mileage              Int               // thousands of km (e.g. 138 = 138,000 km)
   color                String
   vinNumber            String            // stored encrypted; uniqueness enforced via vinNumberHash
   vinNumberHash        String?           @unique // HMAC of plaintext VIN

@@ -145,7 +145,7 @@ export function CarsList({ cars, loading, onView, onEdit, onToggleAvailability, 
             <div className="car-row-line">
               <span className="row-tag">{car.year}</span>
               <span className="row-sep">·</span>
-              <span className="row-tag">{car.mileage.toLocaleString("uk-UA")} км</span>
+              <span className="row-tag">{car.mileage} тис. км</span>
               <span className="row-sep">·</span>
               <span className="row-tag">{car.color}</span>
               <span className="row-sep">·</span>

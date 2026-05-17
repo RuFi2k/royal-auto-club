@@ -264,7 +264,7 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
                 <input required {...numProps("year")} />
               </div>
               <div className="form-field">
-                <label>Пробіг (км) *</label>
+                <label>Пробіг (тис. км) *</label>
                 <input required {...numProps("mileage", { min: 0 })} />
               </div>
               <div className="form-field">

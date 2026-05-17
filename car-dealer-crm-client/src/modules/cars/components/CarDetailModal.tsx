@@ -129,7 +129,7 @@ export function CarDetailModal({ car, onClose, onEdit, onUpdated }: Props) {
             <h3 className="detail-section-title">Основна інформація</h3>
             <div className="detail-grid">
               <Field label="Рік" value={car.year} />
-              <Field label="Пробіг" value={`${car.mileage.toLocaleString("uk-UA")} км`} />
+              <Field label="Пробіг" value={`${car.mileage} тис. км`} />
               <Field label="Колір" value={car.color} />
               <Field label="VIN-номер" value={car.vinNumber} />
               <Field label="Реєстраційний номер" value={car.registrationNumber} />
