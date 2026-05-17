@@ -12,7 +12,8 @@
       "Bash(npx tsc:*)",
       "Bash(npx tsx:*)",
       "Bash(cat .env)",
-      "Bash(cat .env.example)"
+      "Bash(cat .env.example)",
+      "Bash(npm i *)"
     ]
   }
 }
