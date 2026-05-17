@@ -227,6 +227,14 @@ carsRouter.get("/:id/photos", a(async (req, res) => {
   res.json(photos);
 }));
 
+async function syncCoverPhoto(carId: number): Promise<void> {
+  const first = await prisma.carPhoto.findFirst({
+    where: { carId },
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+  });
+  await prisma.car.update({ where: { id: carId }, data: { photoUrl: first?.url ?? null } });
+}
+
 // POST /cars/:id/photos — append a photo to the gallery
 carsRouter.post("/:id/photos", a(async (req, res) => {
   const carId = parseInt(req.params.id as string, 10);
@@ -239,6 +247,7 @@ carsRouter.post("/:id/photos", a(async (req, res) => {
   const photo = await prisma.carPhoto.create({
     data: { carId, url, alt: alt ?? null, sortOrder: next },
   });
+  await syncCoverPhoto(carId);
   syncCarTelegramPost(carId);
   res.status(201).json(photo);
 }));
@@ -275,6 +284,7 @@ carsRouter.put("/:id/photos/order", a(async (req, res) => {
     where: { carId },
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
   });
+  await prisma.car.update({ where: { id: carId }, data: { photoUrl: photos[0]?.url ?? null } });
   syncCarTelegramPost(carId);
   res.json(photos);
 }));
@@ -285,6 +295,7 @@ carsRouter.delete("/:id/photos/:photoId", a(async (req, res) => {
   const photoId = parseInt(req.params.photoId as string, 10);
   if (isNaN(carId) || isNaN(photoId)) { res.status(400).json({ message: "Invalid id" }); return; }
   await prisma.carPhoto.delete({ where: { id: photoId, carId } });
+  await syncCoverPhoto(carId);
   syncCarTelegramPost(carId);
   res.status(204).send();
 }));
