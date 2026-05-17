@@ -16,7 +16,7 @@ const photoUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024, files: 30 },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith("image/")) cb(null, true);
+    if (file.mimetype.startsWith("image/") || file.mimetype === "application/octet-stream") cb(null, true);
     else cb(new Error("Only image files are allowed"));
   },
 });
