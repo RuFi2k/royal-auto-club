@@ -104,8 +104,8 @@ export function buildCarCaption(
   // detail page + dealer phone, so the channel keeps driving traffic to live cars.
   const url = siteUrl
     ? isSold
-      ? `${siteUrl}/ua/cars`
-      : `${siteUrl}/ua/cars/${car.id}`
+      ? `${siteUrl}/ua/cars?utm_source=telegram`
+      : `${siteUrl}/ua/cars/${car.id}?utm_source=telegram`
     : "";
 
   const header = STATUS_HEADER[car.listingStatus] ?? "";
