@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
-import heicConvert from "heic-convert";
 import { admin } from "../../lib/firebase-admin";
 
 const MAX_DIMENSION = 1920;
@@ -13,22 +12,11 @@ export interface OptimizedUpload {
   optimizedSize: number;
 }
 
-function isHeic(buffer: Buffer): boolean {
-  if (buffer.length < 12) return false;
-  if (buffer.toString("ascii", 4, 8) !== "ftyp") return false;
-  const brand = buffer.toString("ascii", 8, 12);
-  return ["heic", "heix", "hevc", "hevx", "mif1", "msf1"].includes(brand);
-}
-
 export async function optimizeAndUpload(
   buffer: Buffer,
   originalName: string,
 ): Promise<OptimizedUpload> {
-  const inputBuffer = isHeic(buffer)
-    ? Buffer.from(await heicConvert({ buffer: buffer as unknown as ArrayBuffer, format: "JPEG", quality: 0.9 }))
-    : buffer;
-
-  const optimized = await sharp(inputBuffer)
+  const optimized = await sharp(buffer)
     .rotate()
     .resize({
       width: MAX_DIMENSION,
