@@ -100,13 +100,8 @@ export function buildCarCaption(
 ): string {
   const siteUrl = opts.siteUrl.replace(/\/+$/, "");
   const isSold = car.listingStatus === "sold";
-  // Sold cars get a CTA to the inventory page instead of their own (now stale)
-  // detail page + dealer phone, so the channel keeps driving traffic to live cars.
-  const url = siteUrl
-    ? isSold
-      ? `${siteUrl}/ua/cars?utm_source=telegram`
-      : `${siteUrl}/ua/cars/${car.id}?utm_source=telegram`
-    : "";
+  const carUrl = siteUrl ? `${siteUrl}/ua/cars/${car.id}?utm_source=telegram` : "";
+  const inventoryUrl = siteUrl ? `${siteUrl}/ua/cars?utm_source=telegram` : "";
 
   const header = STATUS_HEADER[car.listingStatus] ?? "";
   const bodyTypeUa = BODY_TYPE_UA[car.bodyType] ?? car.bodyType;
@@ -131,11 +126,14 @@ export function buildCarCaption(
 
   const priceLine = `💰 ${formatPrice(car.websitePrice)}`;
   const offerLines = isSold ? [] : ["🤝 Торг | Обмін", "🏦 Кредит | Лізинг"];
-  const linkLines = url
-    ? isSold
-      ? [`ℹ️ Більше авто на нашому сайті:`, url]
-      : [`ℹ️ Повна інформація на сайті:`, url]
-    : [];
+  const linkLines: string[] = [];
+  if (carUrl) {
+    linkLines.push(isSold ? `ℹ️ Дивитись авто на сайті:` : `ℹ️ Повна інформація на сайті:`, carUrl);
+  }
+  if (isSold && inventoryUrl) {
+    if (linkLines.length) linkLines.push("");
+    linkLines.push(`🔥 Більше авто на нашому сайті:`, inventoryUrl);
+  }
 
   const fixed = [
     header,
