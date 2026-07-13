@@ -982,6 +982,71 @@ form.modal-body .cars-error,
   cursor: pointer;
 }
 
+/* ── AUTO.RIA options editor ──────────────────────────────── */
+.options-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.options-hint,
+.options-error {
+  font-size: 13px;
+  margin: 0;
+}
+
+.options-hint {
+  color: #718096;
+}
+
+.options-error {
+  color: #c53030;
+}
+
+.options-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.options-group-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #475569;
+  margin: 0;
+}
+
+.options-binary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px 16px;
+}
+
+.options-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #2d3748;
+  cursor: pointer;
+  min-height: 28px;
+}
+
+.options-checkbox input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+@media (max-width: 560px) {
+  .options-binary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Photo archives modal ─────────────────────────────────── */
 .archives-upload-section {
   margin-bottom: 16px;

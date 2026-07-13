@@ -1,4 +1,4 @@
-import type { Car, CarFilters, CarsPage } from "../types/car.types";
+import type { AutoRiaOptionsCatalog, Car, CarFilters, CarsPage } from "../types/car.types";
 import { authHeaders, authHeadersNoContentType } from "./api.helpers";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
@@ -21,6 +21,14 @@ export async function fetchCars(
     headers: await authHeadersNoContentType(),
   });
   if (!res.ok) throw new Error(`Помилка завантаження: ${res.statusText}`);
+  return res.json();
+}
+
+export async function fetchAutoRiaOptions(): Promise<AutoRiaOptionsCatalog> {
+  const res = await fetch(`${API_URL}/cars/autoria/options`, {
+    headers: await authHeadersNoContentType(),
+  });
+  if (!res.ok) throw new Error(`Помилка завантаження опцій: ${res.statusText}`);
   return res.json();
 }
 

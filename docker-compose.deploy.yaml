@@ -104,7 +104,7 @@ services:
     # Production static build (nginx on 5173) — VITE_API_URL is baked in at
     # build time, so changing it requires a rebuild, not just a restart.
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:5173/"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5173/"]
       interval: 15s
       timeout: 5s
       retries: 3

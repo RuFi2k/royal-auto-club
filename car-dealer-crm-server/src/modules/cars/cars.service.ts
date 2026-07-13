@@ -3,6 +3,7 @@ import { prisma } from "../../db";
 import { encrypt, decrypt, hmac } from "../../lib/encryption";
 import { syncCarTelegramPost } from "../telegram/poster";
 import { syncCarAutoRiaAd, deleteAutoRiaAdById } from "../autoria/poster";
+import { normalizeSelectedOptions } from "../autoria/options-catalog";
 
 export type CarCreateInput = Omit<Prisma.CarUncheckedCreateInput, "vinNumberHash">;
 export type CarUpdateInput = Omit<Prisma.CarUncheckedUpdateInput, "vinNumberHash">;
@@ -135,8 +136,28 @@ export const CarsService = {
   },
 
   async getById(id: number): Promise<Car | null> {
-    const car = await prisma.car.findUnique({ where: { id } });
-    return car ? decryptCar(car) : null;
+    const car = await prisma.car.findUnique({ where: { id }, include: { options: true } });
+    if (!car) return null;
+    const { options, ...rest } = car;
+    return { ...decryptCar(rest), options } as Car;
+  },
+
+  // Replace a car's AUTO.RIA options with a validated set (delete-all + insert).
+  async replaceOptions(
+    carId: number,
+    options: Array<{ optionId: number; valueId?: number | null }>,
+  ): Promise<void> {
+    const clean = normalizeSelectedOptions(options);
+    await prisma.$transaction([
+      prisma.carOption.deleteMany({ where: { carId } }),
+      ...(clean.length
+        ? [
+            prisma.carOption.createMany({
+              data: clean.map((o) => ({ carId, optionId: o.optionId, valueId: o.valueId })),
+            }),
+          ]
+        : []),
+    ]);
   },
 
   async getAll(filters: CarFilters = {}) {

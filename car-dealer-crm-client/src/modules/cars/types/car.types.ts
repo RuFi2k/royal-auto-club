@@ -43,8 +43,39 @@ export interface Car {
   priceChangedAt: string | null;
   telegramMessageId?: number | null;
   autoriaAdId?: string | null;
+  options?: SelectedOption[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SelectableValue {
+  id: number;
+  label: string;
+}
+
+export interface BinaryOption {
+  id: number;
+  label: string;
+  group: string;
+}
+
+export interface SelectableOption {
+  id: number;
+  field: string;
+  label: string;
+  group: string;
+  values: SelectableValue[];
+}
+
+export interface AutoRiaOptionsCatalog {
+  groups: string[];
+  binary: BinaryOption[];
+  selectable: SelectableOption[];
+}
+
+export interface SelectedOption {
+  optionId: number;
+  valueId: number | null;
 }
 
 export interface CarFilters {

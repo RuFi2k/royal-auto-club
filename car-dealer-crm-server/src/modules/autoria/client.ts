@@ -110,6 +110,36 @@ export async function riaDelete<T>(
   return (await handle(res)) as T;
 }
 
+// Binary (checkbox) options are managed through dedicated endpoints — the
+// create/update payload's `options` array is ignored by the API.
+export async function riaGetAdOptions(cfg: AutoRiaConfig, adId: string): Promise<number[]> {
+  const res = await fetch(withAuth(cfg, `/auto/used/autos/${adId}/options`, true));
+  const body = await handle(res);
+  if (!Array.isArray(body)) return [];
+  return body
+    .map((o) => Number((o as { id?: unknown }).id))
+    .filter((n) => Number.isFinite(n));
+}
+
+export async function riaAddAdOptions(cfg: AutoRiaConfig, adId: string, ids: number[]): Promise<void> {
+  if (ids.length === 0) return;
+  const res = await fetch(withAuth(cfg, `/auto/used/autos/${adId}/options`, true), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(ids.map((id) => ({ id }))),
+  });
+  await handle(res);
+}
+
+export async function riaRemoveAdOptions(cfg: AutoRiaConfig, adId: string, ids: number[]): Promise<void> {
+  if (ids.length === 0) return;
+  const res = await fetch(
+    withAuth(cfg, `/auto/used/autos/${adId}/options/${ids.join(",")}`, true),
+    { method: "DELETE" },
+  );
+  await handle(res);
+}
+
 // Photo upload: POST /auto/used/autos/:adId/photos/upload with a JSON body of
 // PUBLIC image URLs — AUTO.RIA fetches them itself, one request for all photos:
 //   { "main": "<url>", "links": ["<url>", ...] }

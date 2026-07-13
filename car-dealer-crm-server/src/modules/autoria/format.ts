@@ -5,8 +5,9 @@
 //     model:{id}, body:{id}, mileage, region:{id}, city:{id}, VIN,
 //     gearbox:{id}, drive:{id}, fuel:{id,...}, engine:{volume:{liters}},
 //     power:{hp}, color:{id,metallic}, doors, seats, description:{ru,uk}, ... }
-import type { Car } from "@prisma/client";
+import type { Car, CarOption } from "@prisma/client";
 import type { ResolvedCarIds } from "./mapping";
+import { SELECTABLE_BY_ID } from "./options-catalog";
 
 function stripHtml(s: string | null | undefined): string {
   if (!s) return "";
@@ -65,10 +66,32 @@ export interface AutoRiaAdPayload {
   region?: { id: number };
   city?: { id: number };
   damage?: boolean;
+  // Selectable options are added dynamically by field name (e.g. seatHeated).
+  // NOTE: binary (checkbox) options are NOT part of this payload — the API
+  // ignores an `options` array here; they're managed via the dedicated
+  // options endpoints (see poster.syncAdBinaryOptions).
+  [field: string]: unknown;
+}
+
+// Applies the car's SELECTABLE options as dedicated payload fields keyed by their
+// catalog `field` name, e.g. `seatHeated:{id: valueId}`. Binary options are
+// handled separately (the payload's options array is ignored by AUTO.RIA).
+function applySelectableOptions(payload: AutoRiaAdPayload, options: CarOption[]): void {
+  for (const o of options) {
+    const selectable = SELECTABLE_BY_ID.get(o.optionId);
+    if (selectable && o.valueId !== null) {
+      payload[selectable.field] = { id: o.valueId };
+    }
+  }
 }
 
 // `vin` is passed in decrypted (the Car row stores it encrypted).
-export function buildAdPayload(car: Car, ids: ResolvedCarIds, vin: string): AutoRiaAdPayload {
+export function buildAdPayload(
+  car: Car,
+  ids: ResolvedCarIds,
+  vin: string,
+  options: CarOption[] = [],
+): AutoRiaAdPayload {
   const description = buildDescription(car);
   const payload: AutoRiaAdPayload = {
     year: car.year,
@@ -94,12 +117,19 @@ export function buildAdPayload(car: Car, ids: ResolvedCarIds, vin: string): Auto
   if (ids.regionId !== null) payload.region = { id: ids.regionId };
   if (ids.cityId !== null) payload.city = { id: ids.cityId };
 
+  applySelectableOptions(payload, options);
+
   return payload;
 }
 
 // Subset that's cheap/safe to change after posting (price is editable any time;
 // basic params only within ~1h of posting). We send the full payload on update
 // and let AUTO.RIA apply what it allows.
-export function buildUpdatePayload(car: Car, ids: ResolvedCarIds, vin: string): AutoRiaAdPayload {
-  return buildAdPayload(car, ids, vin);
+export function buildUpdatePayload(
+  car: Car,
+  ids: ResolvedCarIds,
+  vin: string,
+  options: CarOption[] = [],
+): AutoRiaAdPayload {
+  return buildAdPayload(car, ids, vin, options);
 }

@@ -154,6 +154,7 @@ model Car {
   defectsCheckUrl      String?
   photos               CarPhoto[]
   photoArchives        CarPhotoArchive[]
+  options              CarOption[]
 
   priceChangedAt       DateTime?         // set whenever any price field is updated
   createdAt            DateTime          @default(now())
@@ -272,6 +273,24 @@ model CarPhoto {
 
   @@map("car_photos")
   @@index([carId, sortOrder])
+}
+
+// AUTO.RIA equipment options selected for a car (auto-posted to the ad).
+// optionId is the AUTO.RIA option id: for binary (checkbox) options it's the
+// classic catalog id (>= 217) and valueId is null; for selectable options it's
+// the internal field id (128-139) and valueId holds the chosen value. See
+// modules/autoria/options-catalog.ts.
+model CarOption {
+  id       Int  @id @default(autoincrement())
+  carId    Int
+  car      Car  @relation(fields: [carId], references: [id], onDelete: Cascade)
+  optionId Int
+  valueId  Int?
+
+  @@unique([carId, optionId])
+  @@index([optionId])
+  @@index([optionId, valueId])
+  @@map("car_options")
 }
 
 model CarPhotoArchive {

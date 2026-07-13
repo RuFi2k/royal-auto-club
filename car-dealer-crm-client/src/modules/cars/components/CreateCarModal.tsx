@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { createCar, updateCar } from "../services/cars.api";
 import { uploadCarFile } from "../services/storage";
 import { uploadOptimizedPhotos } from "../services/photos.api";
-import type { Car } from "../types/car.types";
+import type { Car, SelectedOption } from "../types/car.types";
 import { CRASH_BODY_PARTS, CRASH_BODY_PART_LABELS } from "../lib/crash-body-parts";
 import { PhotoGalleryModal } from "./PhotoGalleryModal";
 import { RichTextEditor } from "./RichTextEditor";
+import { CarOptionsEditor } from "./CarOptionsEditor";
 
 type StagedPhoto = {
   key: string;       // local stable id
@@ -58,6 +59,7 @@ const DEFAULTS: FormData = {
   airbagReplaced: false,
   crashDetails: null,
   crashBodyParts: [],
+  options: [],
 };
 
 
@@ -83,12 +85,24 @@ function carToForm(car: Car): FormData {
     photoUrl: car.photoUrl, techPassportUrl: car.techPassportUrl, defectsCheckUrl: car.defectsCheckUrl,
     accidentFree: car.accidentFree, crashed: car.crashed, airbagReplaced: car.airbagReplaced,
     crashDetails: car.crashDetails, crashBodyParts: [...(car.crashBodyParts ?? [])],
+    options: (car.options ?? []).map((o) => ({ optionId: o.optionId, valueId: o.valueId })),
     // Normalize Prisma Decimal / numeric fields to avoid false positives
     year: Number(car.year), mileage: Number(car.mileage),
     engineVolume: Number(car.engineVolume), enginePower: Number(car.enginePower),
     doorsCount: Number(car.doorsCount), seatsCount: Number(car.seatsCount),
     ownerPrice: Number(car.ownerPrice), dealerPrice: Number(car.dealerPrice),
   };
+}
+
+function optionsKey(options: SelectedOption[] = []): string {
+  return options
+    .map((o) => `${o.optionId}:${o.valueId ?? "null"}`)
+    .sort()
+    .join("|");
+}
+
+function optionsChanged(current: SelectedOption[] = [], initial: SelectedOption[] = []): boolean {
+  return optionsKey(current) !== optionsKey(initial);
 }
 
 function getChangedFields(current: FormData, initial: FormData): Partial<FormData> {
@@ -173,6 +187,11 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
       let saved: Car;
       if (car) {
         const changes = getChangedFields(formWithFiles, initialForm.current);
+        // Options are compared by set (order-independent), not the generic diff.
+        delete changes.options;
+        if (optionsChanged(form.options, initialForm.current.options)) {
+          changes.options = form.options ?? [];
+        }
         if (Object.keys(changes).length === 0) {
           onSaved(car);
           return;
@@ -622,6 +641,14 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
                 </div>
               </>
             )}
+          </section>
+
+          <section className="form-section form-section-wide">
+            <h3>Опції (AUTO.RIA)</h3>
+            <CarOptionsEditor
+              value={form.options ?? []}
+              onChange={(next) => set("options", next)}
+            />
           </section>
 
           <section className="form-section form-section-wide">

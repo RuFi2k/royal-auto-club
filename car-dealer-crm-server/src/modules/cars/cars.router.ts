@@ -9,6 +9,7 @@ import { optimizeAndUpload } from "./photo-upload";
 import { putObject, deleteObjectByUrl } from "../../lib/storage";
 import { syncCarTelegramPost, republishCarTelegramPost, deleteCarTelegramPost } from "../telegram/poster";
 import { publishCarToAutoRia, deleteCarAutoRiaAd } from "../autoria/poster";
+import { BINARY_OPTIONS, SELECTABLE_OPTIONS, GROUP_ORDER } from "../autoria/options-catalog";
 
 export const carsRouter = Router();
 
@@ -143,6 +144,12 @@ carsRouter.get("/", a(async (req, res) => {
   res.json(result);
 }));
 
+// GET /cars/autoria/options — the AUTO.RIA equipment-options catalog for the UI.
+// Registered before "/:id" so the literal path wins.
+carsRouter.get("/autoria/options", a(async (_req, res) => {
+  res.json({ groups: GROUP_ORDER, binary: BINARY_OPTIONS, selectable: SELECTABLE_OPTIONS });
+}));
+
 // GET /cars/:id
 carsRouter.get("/:id", a(async (req, res) => {
   const id = parseInt(req.params.id as string, 10);
@@ -154,8 +161,9 @@ carsRouter.get("/:id", a(async (req, res) => {
 
 // POST /cars
 carsRouter.post("/", a(async (req, res) => {
-  const { photos, ...carInput } = (req.body ?? {}) as Record<string, unknown> & {
+  const { photos, options, ...carInput } = (req.body ?? {}) as Record<string, unknown> & {
     photos?: Array<{ url: string; alt?: string | null }>;
+    options?: Array<{ optionId: number; valueId?: number | null }>;
   };
 
   // Denormalize cover from gallery if explicit photoUrl wasn't provided.
@@ -179,9 +187,13 @@ carsRouter.post("/", a(async (req, res) => {
     );
   }
 
+  if (Array.isArray(options)) {
+    await CarsService.replaceOptions(car.id, options);
+  }
+
   const withPhotos = await prisma.car.findUnique({
     where: { id: car.id },
-    include: { photos: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] } },
+    include: { photos: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }, options: true },
   });
   syncCarTelegramPost(car.id);
   res.status(201).json(withPhotos ?? car);
@@ -191,12 +203,18 @@ carsRouter.post("/", a(async (req, res) => {
 carsRouter.patch("/:id", a(async (req, res) => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) { res.status(400).json({ message: "Invalid id" }); return; }
-  const body = (req.body ?? {}) as Record<string, unknown>;
+  const { options, ...body } = (req.body ?? {}) as Record<string, unknown> & {
+    options?: Array<{ optionId: number; valueId?: number | null }>;
+  };
   if ("description" in body) {
     body.description = sanitizeRichText(body.description);
   }
-  const car = await CarsService.update(id, body, uid(req));
-  res.json(car);
+  // Replace options first so update()'s AUTO.RIA sync posts the fresh set.
+  if (Array.isArray(options)) {
+    await CarsService.replaceOptions(id, options);
+  }
+  await CarsService.update(id, body, uid(req));
+  res.json(await CarsService.getById(id));
 }));
 
 // PATCH /cars/:id/availability

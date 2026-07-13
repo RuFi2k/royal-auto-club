@@ -13,10 +13,14 @@ import {
   riaPut,
   riaDelete,
   riaUploadPhotos,
+  riaGetAdOptions,
+  riaAddAdOptions,
+  riaRemoveAdOptions,
   RIA_DELETE_REASON,
 } from "./client";
 import { resolveCarIds } from "./mapping";
 import { buildAdPayload, buildUpdatePayload } from "./format";
+import { BINARY_IDS } from "./options-catalog";
 
 // Car.vinNumber is stored encrypted; tolerate legacy plaintext rows.
 function carVin(car: Car): string {
@@ -41,7 +45,10 @@ function extractAdId(res: unknown): string | null {
 async function carWithPhotos(carId: number) {
   return prisma.car.findUnique({
     where: { id: carId },
-    include: { photos: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] } },
+    include: {
+      photos: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
+      options: true,
+    },
   });
 }
 
@@ -66,6 +73,33 @@ async function uploadPhotos(cfg: AutoRiaConfig, adId: string, urls: string[]): P
   }
 }
 
+// Binary (checkbox) options live behind dedicated endpoints, so we reconcile the
+// ad's current set with the car's desired set (add missing, remove stale).
+// Selectable options are not touched here — they ride along in the ad payload.
+async function syncAdBinaryOptions(
+  cfg: AutoRiaConfig,
+  adId: string,
+  options: { optionId: number; valueId: number | null }[],
+): Promise<void> {
+  const desired = new Set(
+    options.filter((o) => o.valueId === null && BINARY_IDS.has(o.optionId)).map((o) => o.optionId),
+  );
+  let current: number[] = [];
+  try {
+    current = await riaGetAdOptions(cfg, adId);
+  } catch (err) {
+    console.error(`[autoria] read options failed for ad ${adId}:`, err);
+  }
+  const toRemove = current.filter((id) => !desired.has(id));
+  const toAdd = [...desired].filter((id) => !current.includes(id));
+  try {
+    await riaRemoveAdOptions(cfg, adId, toRemove);
+    await riaAddAdOptions(cfg, adId, toAdd);
+  } catch (err) {
+    console.error(`[autoria] sync options failed for ad ${adId}:`, err);
+  }
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 // Explicit publish (or republish). Creates the ad, stores its id, uploads photos.
@@ -86,12 +120,13 @@ export async function publishCarToAutoRia(carId: number): Promise<{ adId: string
   }
 
   const ids = await resolveCarIds(cfg, car);
-  const payload = buildAdPayload(car, ids, carVin(car));
+  const payload = buildAdPayload(car, ids, carVin(car), car.options);
   const res = await riaPost<unknown>(cfg, "/auto/used/autos/", payload);
   const adId = extractAdId(res);
   if (!adId) throw new Error("AUTO.RIA не повернув id оголошення");
 
   await prisma.car.update({ where: { id: car.id }, data: { autoriaAdId: adId } });
+  await syncAdBinaryOptions(cfg, adId, car.options);
   await uploadPhotos(cfg, adId, photoUrls(car));
   return { adId };
 }
@@ -108,7 +143,7 @@ async function runSync(carId: number): Promise<void> {
   const cfg = autoriaConfig();
   if (!cfg) return; // disabled silently when env not set
 
-  const car = await prisma.car.findUnique({ where: { id: carId } });
+  const car = await prisma.car.findUnique({ where: { id: carId }, include: { options: true } });
   if (!car || !car.autoriaAdId) return; // never published → nothing to sync
 
   if (car.listingStatus === "sold" || car.listingStatus === "archived") {
@@ -122,8 +157,9 @@ async function runSync(carId: number): Promise<void> {
   }
 
   const ids = await resolveCarIds(cfg, car);
-  const payload = buildUpdatePayload(car, ids, carVin(car));
+  const payload = buildUpdatePayload(car, ids, carVin(car), car.options);
   await riaPut(cfg, `/auto/used/autos/${car.autoriaAdId}`, payload);
+  await syncAdBinaryOptions(cfg, car.autoriaAdId, car.options);
 }
 
 // Explicit delete (button). Removes the ad and clears the stored id.
