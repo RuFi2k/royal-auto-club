@@ -27,6 +27,7 @@ export function CarOptionsEditor({ value, onChange, carInfo }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [suggesting, setSuggesting] = useState(false);
   const [suggestError, setSuggestError] = useState<string | null>(null);
+  const [activeGroup, setActiveGroup] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -99,6 +100,22 @@ export function CarOptionsEditor({ value, onChange, carInfo }: Props) {
   if (error) return <p className="options-error">{error}</p>;
   if (!catalog) return null;
 
+  // Groups (in catalog order) that actually have at least one option.
+  const groupData = catalog.groups
+    .map((group) => ({
+      group,
+      binary: catalog.binary.filter((o) => o.group === group),
+      selectable: catalog.selectable.filter((o) => o.group === group),
+    }))
+    .filter((g) => g.binary.length > 0 || g.selectable.length > 0);
+
+  const currentGroup =
+    (activeGroup && groupData.some((g) => g.group === activeGroup) ? activeGroup : null) ??
+    groupData[0]?.group ??
+    null;
+
+  const active = groupData.find((g) => g.group === currentGroup);
+
   return (
     <div className="options-editor">
       {catalog.aiEnabled && (
@@ -121,43 +138,58 @@ export function CarOptionsEditor({ value, onChange, carInfo }: Props) {
         </div>
       )}
 
-      {catalog.groups.map((group) => {
-        const binary = catalog.binary.filter((o) => o.group === group);
-        const selectable = catalog.selectable.filter((o) => o.group === group);
-        if (binary.length === 0 && selectable.length === 0) return null;
+      {groupData.length > 0 && (
+        <div className="options-tabs" role="tablist">
+          {groupData.map(({ group, binary, selectable }) => {
+            const count =
+              binary.filter((o) => binaryIds.has(o.id)).length +
+              selectable.filter((o) => selectedValueByOption.has(o.id)).length;
+            return (
+              <button
+                key={group}
+                type="button"
+                role="tab"
+                aria-selected={group === currentGroup}
+                className={`options-tab${group === currentGroup ? " options-tab-active" : ""}`}
+                onClick={() => setActiveGroup(group)}
+              >
+                {group}
+                {count > 0 && <span className="options-tab-badge">{count}</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
-        return (
-          <div key={group} className="options-group">
-            <h4 className="options-group-title">{group}</h4>
+      {active && (
+        <div className="options-group">
+          {active.selectable.length > 0 && (
+            <div className="form-grid">
+              {active.selectable.map((opt) => (
+                <SelectableField
+                  key={opt.id}
+                  option={opt}
+                  value={selectedValueByOption.get(opt.id) ?? null}
+                  onChange={(v) => setSelectable(opt.id, v)}
+                />
+              ))}
+            </div>
+          )}
 
-            {selectable.length > 0 && (
-              <div className="form-grid">
-                {selectable.map((opt) => (
-                  <SelectableField
-                    key={opt.id}
-                    option={opt}
-                    value={selectedValueByOption.get(opt.id) ?? null}
-                    onChange={(v) => setSelectable(opt.id, v)}
-                  />
-                ))}
-              </div>
-            )}
-
-            {binary.length > 0 && (
-              <div className="options-binary-grid">
-                {binary.map((opt) => (
-                  <BinaryField
-                    key={opt.id}
-                    option={opt}
-                    checked={binaryIds.has(opt.id)}
-                    onToggle={(c) => toggleBinary(opt.id, c)}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
+          {active.binary.length > 0 && (
+            <div className="options-binary-grid">
+              {active.binary.map((opt) => (
+                <BinaryField
+                  key={opt.id}
+                  option={opt}
+                  checked={binaryIds.has(opt.id)}
+                  onToggle={(c) => toggleBinary(opt.id, c)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

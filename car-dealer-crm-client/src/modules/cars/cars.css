@@ -1003,6 +1003,71 @@ form.modal-body .cars-error,
   color: #c53030;
 }
 
+/* ── Options tabs (by group) ──────────────────────────────── */
+.options-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.options-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.options-tab:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.options-tab-active {
+  background: #1a1a2e;
+  color: #fff;
+  border-color: #1a1a2e;
+}
+
+.options-tab-active:hover {
+  background: #1a1a2e;
+  color: #fff;
+}
+
+.options-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #4a90d9;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.options-tab-active .options-tab-badge {
+  background: #4a90d9;
+}
+
 .options-group {
   display: flex;
   flex-direction: column;
