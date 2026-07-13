@@ -2,19 +2,30 @@ import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import cron from "node-cron";
+import { toNodeHandler } from "better-auth/node";
 import { carsRouter } from "./modules/cars/cars.router";
 import { statsRouter } from "./modules/stats/stats.router";
 import { usersRouter } from "./modules/users/users.router";
 import { publicRouter } from "./modules/public/public.router";
 import { prisma } from "./db";
 import { runBackup } from "./lib/backup";
+import { auth, isAdminEmail } from "./lib/auth";
 
 const app = express();
 const PORT = process.env.PORT ?? 3000;
 
 app.set("trust proxy", 1); // Trust Nginx reverse proxy
 
-app.use(cors({ origin: process.env.CORS_ORIGIN ?? "http://localhost:5173" }));
+const corsOrigins = (process.env.CORS_ORIGIN ?? "http://localhost:5173")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+app.use(cors({ origin: corsOrigins, credentials: true }));
+
+// Better Auth handler — MUST be mounted before express.json() so it can read the
+// raw request body for its own routes.
+app.all("/api/auth/*", toNodeHandler(auth));
+
 app.use(express.json());
 app.use(
   rateLimit({
@@ -41,8 +52,27 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ message: "Internal server error" });
 });
 
+// Create the initial admin account if it doesn't exist yet. The databaseHook in
+// lib/auth.ts auto-approves users whose email is in ADMIN_EMAILS.
+async function seedAdmin() {
+  const adminEmail = (process.env.ADMIN_EMAILS ?? "").split(",")[0]?.trim();
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminEmail || !adminPassword) return;
+  const existing = await prisma.user.findUnique({ where: { email: adminEmail } });
+  if (existing) return;
+  try {
+    await auth.api.signUpEmail({
+      body: { email: adminEmail, password: adminPassword, name: "Admin" },
+    });
+    console.log(`[seed] admin account created: ${adminEmail} (admin=${isAdminEmail(adminEmail)})`);
+  } catch (err) {
+    console.error("[seed] failed to create admin:", err);
+  }
+}
+
 async function main() {
   await prisma.$connect();
+  await seedAdmin();
   app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });

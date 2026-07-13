@@ -24,8 +24,6 @@ function toPublicCar(car: CarWithPhotos) {
     vinNumberHash: _hash,
     registrationNumber: _reg,
     ownerPrice: _owner,
-    dealerPrice: _dealer,
-    generalPrice: _general,
     responsiblePerson: _resp,
     priceChangedAt: _pca,
     photos,
@@ -67,8 +65,6 @@ const ENGINE_TYPES = new Set([
 ]);
 const GEARBOX_TYPES = new Set(["manual", "automatic", "cvt", "robot", "dual_clutch"]);
 const DRIVETRAINS = new Set(["fwd", "rwd", "awd", "four_wd"]);
-const CABIN_TYPES = new Set(["standard", "extended", "crew_cab", "panoramic"]);
-const CUSTOMS = new Set(["cleared", "not_cleared", "in_progress"]);
 const CAR_ORIGINS = new Set(["EU", "US", "korea", "japan", "china", "other"]);
 const CAR_LOCATIONS = new Set(["owner", "dealership"]);
 const SELL_TYPES = new Set(["retail", "wholesale", "auction", "consignment"]);
@@ -106,7 +102,7 @@ publicRouter.get("/cars", a(async (req, res) => {
   const pmn = q.priceMin ? parseFloat(str(q.priceMin)!) : undefined;
   const pmx = q.priceMax ? parseFloat(str(q.priceMax)!) : undefined;
   if (pmn !== undefined || pmx !== undefined) {
-    where.websitePrice = { ...(pmn !== undefined ? { gte: pmn } : {}), ...(pmx !== undefined ? { lte: pmx } : {}) };
+    where.dealerPrice = { ...(pmn !== undefined ? { gte: pmn } : {}), ...(pmx !== undefined ? { lte: pmx } : {}) };
   }
   const carOrigin = pickEnum(q.carOrigin, CAR_ORIGINS);
   if (carOrigin) where.carOrigin = carOrigin as Prisma.EnumCarOriginFilter;
@@ -127,10 +123,6 @@ publicRouter.get("/cars", a(async (req, res) => {
       ? { in: ["awd", "four_wd"] }
       : (drv as Prisma.EnumDrivetrainFilter);
   }
-  const cabinType = pickEnum(q.cabinType, CABIN_TYPES);
-  if (cabinType) where.cabinType = cabinType as Prisma.EnumCabinTypeFilter;
-  const customsStatus = pickEnum(q.customsStatus, CUSTOMS);
-  if (customsStatus) where.customsStatus = customsStatus as Prisma.EnumCustomsStatusFilter;
   const sellType = pickEnum(q.sellType, SELL_TYPES);
   if (sellType) where.sellType = sellType as Prisma.EnumSellTypeFilter;
   if (str(q.isCryptoAvailable) !== undefined) {

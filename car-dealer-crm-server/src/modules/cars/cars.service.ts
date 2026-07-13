@@ -2,6 +2,7 @@ import { Car, Prisma } from "@prisma/client";
 import { prisma } from "../../db";
 import { encrypt, decrypt, hmac } from "../../lib/encryption";
 import { syncCarTelegramPost } from "../telegram/poster";
+import { syncCarAutoRiaAd, deleteAutoRiaAdById } from "../autoria/poster";
 
 export type CarCreateInput = Omit<Prisma.CarUncheckedCreateInput, "vinNumberHash">;
 export type CarUpdateInput = Omit<Prisma.CarUncheckedUpdateInput, "vinNumberHash">;
@@ -23,8 +24,6 @@ export interface CarFilters {
   engineType?: string;
   gearboxType?: string;
   drivetrain?: string;
-  cabinType?: string;
-  customsStatus?: string;
   sellType?: string;
   yearMin?: number;
   yearMax?: number;
@@ -154,7 +153,7 @@ export const CarsService = {
       };
     }
     if (rest.priceMin !== undefined || rest.priceMax !== undefined) {
-      where.websitePrice = {
+      where.dealerPrice = {
         ...(rest.priceMin !== undefined ? { gte: rest.priceMin } : {}),
         ...(rest.priceMax !== undefined ? { lte: rest.priceMax } : {}),
       };
@@ -178,8 +177,6 @@ export const CarsService = {
         where.drivetrain = rest.drivetrain as Prisma.EnumDrivetrainFilter;
       }
     }
-    if (rest.cabinType) where.cabinType = rest.cabinType as Prisma.EnumCabinTypeFilter;
-    if (rest.customsStatus) where.customsStatus = rest.customsStatus as Prisma.EnumCustomsStatusFilter;
     if (rest.sellType) where.sellType = rest.sellType as Prisma.EnumSellTypeFilter;
     if (rest.isCryptoAvailable !== undefined) where.isCryptoAvailable = rest.isCryptoAvailable;
     if (rest.yearMin !== undefined || rest.yearMax !== undefined) {
@@ -224,7 +221,7 @@ export const CarsService = {
     const before = await prisma.car.findUnique({ where: { id } });
     if (!before) throw Object.assign(new Error("Car not found"), { status: 404 });
 
-    const priceFields = ["ownerPrice", "websitePrice", "dealerPrice", "generalPrice"];
+    const priceFields = ["ownerPrice", "dealerPrice"];
     const touchesPrice = priceFields.some((f) => f in data);
     const synced = syncStatusFields(data as Record<string, unknown>, before);
     const encrypted = encryptInput(synced);
@@ -254,6 +251,7 @@ export const CarsService = {
     });
 
     syncCarTelegramPost(id);
+    syncCarAutoRiaAd(id);
     return decryptedAfter;
   },
 
@@ -270,6 +268,10 @@ export const CarsService = {
           : undefined,
       },
     });
+    // Remove the AUTO.RIA ad too (row is gone; nothing to null out afterwards).
+    void deleteAutoRiaAdById(car?.autoriaAdId).catch((err) =>
+      console.error(`[autoria] delete on car removal failed for ${id}:`, err),
+    );
   },
 
   async setAvailability(id: number, isAvailable: boolean, userId: string): Promise<Car> {
@@ -303,6 +305,7 @@ export const CarsService = {
       },
     });
     syncCarTelegramPost(id);
+    syncCarAutoRiaAd(id);
     return decryptCar(updated);
   },
 

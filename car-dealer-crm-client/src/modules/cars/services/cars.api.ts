@@ -75,6 +75,29 @@ export async function deleteCarTelegramPost(id: number): Promise<void> {
   }
 }
 
+export async function publishCarToAutoRia(id: number): Promise<{ adId: string | null }> {
+  const res = await fetch(`${API_URL}/cars/${id}/autoria/publish`, {
+    method: "POST",
+    headers: await authHeaders(),
+  });
+  if (!res.ok) {
+    const msg = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(msg.message ?? "Помилка публікації на AUTO.RIA");
+  }
+  return res.json();
+}
+
+export async function deleteCarAutoRiaAd(id: number): Promise<void> {
+  const res = await fetch(`${API_URL}/cars/${id}/autoria`, {
+    method: "DELETE",
+    headers: await authHeadersNoContentType(),
+  });
+  if (!res.ok) {
+    const msg = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(msg.message ?? "Помилка видалення з AUTO.RIA");
+  }
+}
+
 export async function setCarAvailability(id: number, isAvailable: boolean): Promise<Car> {
   const res = await fetch(`${API_URL}/cars/${id}/availability`, {
     method: "PATCH",

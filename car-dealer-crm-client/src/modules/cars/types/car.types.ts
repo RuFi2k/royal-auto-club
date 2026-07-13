@@ -16,17 +16,13 @@ export interface Car {
   bodyType: string;
   doorsCount: number;
   seatsCount: number;
-  cabinType: string;
-  customsStatus: string;
   carOrigin: string;
   carLocation: string;
   location: string;
   sellType: string;
   isCryptoAvailable: boolean;
   ownerPrice: number;
-  websitePrice: number;
   dealerPrice: number;
-  generalPrice: number;
   isAvailable: boolean;
   responsiblePerson: string;
   shortDescription: string | null;
@@ -46,6 +42,7 @@ export interface Car {
   defectsCheckUrl: string | null;
   priceChangedAt: string | null;
   telegramMessageId?: number | null;
+  autoriaAdId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -66,8 +63,6 @@ export interface CarFilters {
   engineType?: string;
   gearboxType?: string;
   drivetrain?: string;
-  cabinType?: string;
-  customsStatus?: string;
   sellType?: string;
   yearMin?: string;
   yearMax?: string;

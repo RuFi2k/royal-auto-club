@@ -12,12 +12,23 @@ function email(req: Request): string {
   return (req as AuthRequest).email;
 }
 
+// Map Better Auth's `id` to the `uid` field the client expects.
+function toClientUser(u: { id: string; email: string; name: string | null; disabled: boolean; createdAt: Date }) {
+  return {
+    uid: u.id,
+    email: u.email,
+    name: u.name,
+    disabled: u.disabled,
+    isAdmin: isAdminEmail(u.email),
+    createdAt: u.createdAt,
+  };
+}
+
 // GET /users/status — uses requireFirebaseAuth so pending users can call it
 usersRouter.get("/status", requireFirebaseAuth, async (req: Request, res: Response) => {
   const userUid = uid(req);
   const userEmail = email(req);
   const admin = isAdminEmail(userEmail);
-  await UsersService.upsert(userUid, userEmail);
   const status = await UsersService.getStatus(userUid, userEmail, admin);
   res.json(status);
 });
@@ -36,19 +47,19 @@ function requireAdmin(req: Request, res: Response, next: () => void) {
 // GET /users/pending — admin only
 usersRouter.get("/pending", requireAdmin, async (_req: Request, res: Response) => {
   const users = await UsersService.getPending();
-  res.json(users);
+  res.json(users.map(toClientUser));
 });
 
 // GET /users/approved — admin only
 usersRouter.get("/approved", requireAdmin, async (_req: Request, res: Response) => {
   const users = await UsersService.getApproved();
-  res.json(users.map((u) => ({ ...u, isAdmin: isAdminEmail(u.email) })));
+  res.json(users.map(toClientUser));
 });
 
 // PATCH /users/:uid/approve — admin only
 usersRouter.patch("/:uid/approve", requireAdmin, async (req: Request, res: Response) => {
   const user = await UsersService.approve(req.params.uid as string);
-  res.json(user);
+  res.json(toClientUser(user));
 });
 
 // PATCH /users/:uid/disable — admin only
@@ -64,14 +75,14 @@ usersRouter.patch("/:uid/disable", requireAdmin, async (req: Request, res: Respo
     return;
   }
   const user = await UsersService.disable(targetUid);
-  evictFromCache(targetUid);
-  res.json(user);
+  await evictFromCache(targetUid);
+  res.json(toClientUser(user));
 });
 
 // PATCH /users/:uid/enable — admin only
 usersRouter.patch("/:uid/enable", requireAdmin, async (req: Request, res: Response) => {
   const user = await UsersService.enable(req.params.uid as string);
-  res.json(user);
+  res.json(toClientUser(user));
 });
 
 // DELETE /users/:uid — admin only

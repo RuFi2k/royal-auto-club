@@ -47,19 +47,6 @@ enum Drivetrain {
   four_wd
 }
 
-enum CabinType {
-  standard
-  extended
-  crew_cab
-  panoramic
-}
-
-enum CustomsStatus {
-  cleared
-  not_cleared
-  in_progress
-}
-
 enum SellType {
   retail
   wholesale
@@ -126,10 +113,8 @@ model Car {
   bodyType             BodyType
   doorsCount           Int
   seatsCount           Int
-  cabinType            CabinType
 
   // Status & logistics
-  customsStatus        CustomsStatus
   carOrigin            CarOrigin
   carLocation          CarLocationStatus
   location             String            // physical address / city
@@ -138,9 +123,7 @@ model Car {
   sellType             SellType
   isCryptoAvailable    Boolean           @default(false)
   ownerPrice           Decimal           @db.Decimal(12, 2) // price the owner wants
-  websitePrice         Decimal           @db.Decimal(12, 2) // price shown on website
-  dealerPrice          Decimal           @db.Decimal(12, 2) // price for dealers
-  generalPrice         Decimal           @db.Decimal(12, 2) // base/internal price
+  dealerPrice          Decimal           @db.Decimal(12, 2) // public asking price (site, Telegram, AUTO.RIA)
   isAvailable          Boolean           @default(true)
   soldAt               DateTime?         // set when isAvailable flips true→false; cleared on re-listing
 
@@ -181,6 +164,11 @@ model Car {
   // null when never posted (e.g. archived from creation, or before this feature).
   telegramMessageId    Int?
 
+  // AUTO.RIA advertisement id (the `_id` returned by POST /auto/used/autos).
+  // Set when an admin publishes the car to AUTO.RIA; used to edit/delete the ad
+  // in sync with CRM changes. null when never published.
+  autoriaAdId          String?
+
   @@map("cars")
   @@index([listingStatus])
   @@index([listingStatus, createdAt(sort: Desc)])
@@ -210,15 +198,67 @@ model AuditLog {
   @@index([timestamp])
 }
 
-model AppUser {
-  uid       String   @id
-  email     String   @unique
-  name      String?
-  approved  Boolean  @default(false)
-  disabled  Boolean  @default(false)
-  createdAt DateTime @default(now())
+// ── Better Auth ───────────────────────────────────────────────────────────────
+// User/session/account/verification are managed by Better Auth. `approved` and
+// `disabled` are CRM-specific fields driving the access-approval workflow.
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  approved      Boolean   @default(false)
+  disabled      Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
 
-  @@map("app_users")
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verification")
 }
 
 model CarPhoto {

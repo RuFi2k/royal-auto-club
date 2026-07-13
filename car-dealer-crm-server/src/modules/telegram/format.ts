@@ -124,7 +124,7 @@ export function buildCarCaption(
     car.color ? `🎨 Колір: ${escapeHtml(car.color)}` : "",
   ].filter(Boolean);
 
-  const priceLine = `💰 ${formatPrice(car.websitePrice)}`;
+  const priceLine = `💰 ${formatPrice(car.dealerPrice)}`;
   const offerLines = isSold ? [] : ["🤝 Торг | Обмін", "🏦 Кредит | Лізинг"];
   const linkLines: string[] = [];
   if (carUrl) {

@@ -6,5 +6,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    host: true,
+    // Served behind nginx/Cloudflare under a custom domain — allow it through
+    // Vite's host check.
+    allowedHosts: true,
   },
 })

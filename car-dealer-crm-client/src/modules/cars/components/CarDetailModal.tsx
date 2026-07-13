@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Car } from "../types/car.types";
 import { CRASH_BODY_PART_LABELS } from "../lib/crash-body-parts";
-import { publishCarToTelegram, deleteCarTelegramPost } from "../services/cars.api";
+import { publishCarToTelegram, deleteCarTelegramPost, publishCarToAutoRia, deleteCarAutoRiaAd } from "../services/cars.api";
 
 interface Props {
   car: Car;
@@ -35,17 +35,11 @@ const BODY_TYPE: Record<string, string> = {
   coupe: "Купе", wagon: "Універсал", minivan: "Мінівен", pickup: "Пікап",
   van: "Фургон", convertible: "Кабріолет", liftback: "Ліфтбек",
 };
-const CABIN_TYPE: Record<string, string> = {
-  standard: "Стандарт", extended: "Подовжена", crew_cab: "Подвійна кабіна", panoramic: "Панорамна",
-};
-const CUSTOMS: Record<string, string> = {
-  cleared: "Розмитнено", not_cleared: "Не розмитнено", in_progress: "В процесі",
-};
 const CAR_ORIGIN: Record<string, string> = {
   EU: "ЄС", US: "США", korea: "Корея", japan: "Японія", china: "Китай", other: "Інше",
 };
 const CAR_LOCATION: Record<string, string> = {
-  dealership: "Автосалон", owner: "Власник",
+  dealership: "Площадка", owner: "Власник",
 };
 const SELL_TYPE: Record<string, string> = {
   retail: "Роздріб", wholesale: "Гурт", auction: "Аукціон", consignment: "Консигнація",
@@ -63,7 +57,11 @@ function Field({ label, value }: { label: string; value: string | number }) {
 export function CarDetailModal({ car, onClose, onEdit, onUpdated }: Props) {
   const [tgBusy, setTgBusy] = useState<"publish" | "delete" | null>(null);
   const [tgError, setTgError] = useState<string | null>(null);
+  const [riaBusy, setRiaBusy] = useState<"publish" | "delete" | null>(null);
+  const [riaError, setRiaError] = useState<string | null>(null);
   const isArchived = car.listingStatus === "archived";
+  const isSold = car.listingStatus === "sold";
+  const riaDisabled = isArchived || isSold;
 
   async function handlePublish() {
     if (isArchived) return;
@@ -95,6 +93,39 @@ export function CarDetailModal({ car, onClose, onEdit, onUpdated }: Props) {
       setTgError(err.message ?? "Не вдалося видалити");
     } finally {
       setTgBusy(null);
+    }
+  }
+
+  async function handleRiaPublish() {
+    if (riaDisabled) return;
+    if (car.autoriaAdId) {
+      const ok = window.confirm("Перепублікувати оголошення на AUTO.RIA?\nСтаре оголошення буде видалено, нове — створено.");
+      if (!ok) return;
+    }
+    setRiaError(null);
+    setRiaBusy("publish");
+    try {
+      const { adId } = await publishCarToAutoRia(car.id);
+      onUpdated?.({ ...car, autoriaAdId: adId });
+    } catch (err: any) {
+      setRiaError(err.message ?? "Не вдалося опублікувати");
+    } finally {
+      setRiaBusy(null);
+    }
+  }
+
+  async function handleRiaDelete() {
+    const ok = window.confirm("Видалити оголошення на AUTO.RIA?");
+    if (!ok) return;
+    setRiaError(null);
+    setRiaBusy("delete");
+    try {
+      await deleteCarAutoRiaAd(car.id);
+      onUpdated?.({ ...car, autoriaAdId: null });
+    } catch (err: any) {
+      setRiaError(err.message ?? "Не вдалося видалити");
+    } finally {
+      setRiaBusy(null);
     }
   }
 
@@ -154,14 +185,12 @@ export function CarDetailModal({ car, onClose, onEdit, onUpdated }: Props) {
               <Field label="Тип кузова" value={BODY_TYPE[car.bodyType] ?? car.bodyType} />
               <Field label="Дверей" value={car.doorsCount} />
               <Field label="Місць" value={car.seatsCount} />
-              <Field label="Тип кабіни" value={CABIN_TYPE[car.cabinType] ?? car.cabinType} />
             </div>
           </div>
 
           <div className="detail-section">
             <h3 className="detail-section-title">Статус і логістика</h3>
             <div className="detail-grid">
-              <Field label="Розмитнення" value={CUSTOMS[car.customsStatus] ?? car.customsStatus} />
               <Field label="Походження" value={CAR_ORIGIN[car.carOrigin] ?? car.carOrigin} />
               <Field label="Розташування" value={CAR_LOCATION[car.carLocation] ?? car.carLocation} />
               <Field label="Адреса" value={car.location} />
@@ -173,9 +202,7 @@ export function CarDetailModal({ car, onClose, onEdit, onUpdated }: Props) {
             <div className="detail-grid">
               <Field label="Тип продажу" value={SELL_TYPE[car.sellType] ?? car.sellType} />
               <Field label="Ціна власника" value={fmt(car.ownerPrice)} />
-              <Field label="Ціна на сайті" value={fmt(car.websitePrice)} />
               <Field label="Ціна для дилерів" value={fmt(car.dealerPrice)} />
-              <Field label="Загальна ціна" value={fmt(car.generalPrice)} />
               {car.isCryptoAvailable && <Field label="Оплата" value="Криптовалюта доступна" />}
             </div>
           </div>
@@ -382,6 +409,33 @@ export function CarDetailModal({ car, onClose, onEdit, onUpdated }: Props) {
               </button>
             )}
             {tgError && <span className="detail-tg-error">{tgError}</span>}
+          </div>
+          <div className="detail-footer-telegram">
+            <span className="detail-tg-status">
+              AUTO.RIA: {car.autoriaAdId
+                ? <strong>опубліковано #{car.autoriaAdId}</strong>
+                : <strong>не опубліковано</strong>}
+            </span>
+            <button
+              className="filter-reset"
+              onClick={handleRiaPublish}
+              disabled={riaBusy !== null || riaDisabled}
+              title={riaDisabled ? "Продані/архівні авто не публікуються на AUTO.RIA" : ""}
+            >
+              {riaBusy === "publish"
+                ? "..."
+                : car.autoriaAdId ? "Перепублікувати на AUTO.RIA" : "Опублікувати на AUTO.RIA"}
+            </button>
+            {car.autoriaAdId && (
+              <button
+                className="filter-reset"
+                onClick={handleRiaDelete}
+                disabled={riaBusy !== null}
+              >
+                {riaBusy === "delete" ? "..." : "Видалити оголошення"}
+              </button>
+            )}
+            {riaError && <span className="detail-tg-error">{riaError}</span>}
           </div>
           <div className="detail-footer-actions">
             <button className="filter-reset" onClick={onClose}>Закрити</button>
