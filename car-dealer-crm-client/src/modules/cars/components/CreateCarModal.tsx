@@ -648,6 +648,13 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
             <CarOptionsEditor
               value={form.options ?? []}
               onChange={(next) => set("options", next)}
+              carInfo={{
+                brand: form.brand,
+                model: form.model,
+                year: form.year,
+                bodyType: form.bodyType,
+                engineType: form.engineType,
+              }}
             />
           </section>
 

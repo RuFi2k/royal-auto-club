@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { fetchAutoRiaOptions } from "../services/cars.api";
+import { fetchAutoRiaOptions, suggestAutoRiaOptions } from "../services/cars.api";
 import type {
   AutoRiaOptionsCatalog,
   BinaryOption,
@@ -7,15 +7,26 @@ import type {
   SelectedOption,
 } from "../types/car.types";
 
+interface CarInfo {
+  brand?: string;
+  model?: string;
+  year?: number;
+  bodyType?: string | null;
+  engineType?: string | null;
+}
+
 interface Props {
   value: SelectedOption[];
   onChange: (next: SelectedOption[]) => void;
+  carInfo?: CarInfo;
 }
 
-export function CarOptionsEditor({ value, onChange }: Props) {
+export function CarOptionsEditor({ value, onChange, carInfo }: Props) {
   const [catalog, setCatalog] = useState<AutoRiaOptionsCatalog | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -58,12 +69,58 @@ export function CarOptionsEditor({ value, onChange }: Props) {
     onChange(valueId === null ? rest : [...rest, { optionId, valueId }]);
   }
 
+  const canSuggest = Boolean(carInfo?.brand && carInfo?.model && carInfo?.year);
+
+  async function handleSuggest() {
+    if (!canSuggest || !carInfo) return;
+    setSuggesting(true);
+    setSuggestError(null);
+    try {
+      const suggested = await suggestAutoRiaOptions({
+        brand: carInfo.brand as string,
+        model: carInfo.model as string,
+        year: carInfo.year as number,
+        bodyType: carInfo.bodyType,
+        engineType: carInfo.engineType,
+      });
+      // Union by optionId: suggested entries replace existing ones with the
+      // same optionId, keep the user's manual selections the AI didn't mention.
+      const suggestedIds = new Set(suggested.map((o) => o.optionId));
+      const merged = [...value.filter((o) => !suggestedIds.has(o.optionId)), ...suggested];
+      onChange(merged);
+    } catch (err: unknown) {
+      setSuggestError(err instanceof Error ? err.message : "Не вдалося отримати підказку");
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
   if (loading) return <p className="options-hint">Завантаження опцій…</p>;
   if (error) return <p className="options-error">{error}</p>;
   if (!catalog) return null;
 
   return (
     <div className="options-editor">
+      {catalog.aiEnabled && (
+        <div className="options-ai">
+          <button
+            type="button"
+            className="options-ai-btn"
+            onClick={handleSuggest}
+            disabled={!canSuggest || suggesting}
+            title={
+              canSuggest
+                ? "Підібрати опції за маркою, моделлю та роком"
+                : "Спочатку вкажіть марку, модель і рік"
+            }
+          >
+            {suggesting ? "Аналізую…" : "✨ Заповнити з AI"}
+          </button>
+          <span className="options-ai-hint">На основі марки, моделі та року</span>
+          {suggestError && <span className="options-ai-error">{suggestError}</span>}
+        </div>
+      )}
+
       {catalog.groups.map((group) => {
         const binary = catalog.binary.filter((o) => o.group === group);
         const selectable = catalog.selectable.filter((o) => o.group === group);

@@ -71,6 +71,7 @@ export interface AutoRiaOptionsCatalog {
   groups: string[];
   binary: BinaryOption[];
   selectable: SelectableOption[];
+  aiEnabled?: boolean;
 }
 
 export interface SelectedOption {

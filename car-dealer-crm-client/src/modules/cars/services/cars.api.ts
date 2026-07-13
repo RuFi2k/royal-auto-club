@@ -1,4 +1,4 @@
-import type { AutoRiaOptionsCatalog, Car, CarFilters, CarsPage } from "../types/car.types";
+import type { AutoRiaOptionsCatalog, Car, CarFilters, CarsPage, SelectedOption } from "../types/car.types";
 import { authHeaders, authHeadersNoContentType } from "./api.helpers";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
@@ -30,6 +30,26 @@ export async function fetchAutoRiaOptions(): Promise<AutoRiaOptionsCatalog> {
   });
   if (!res.ok) throw new Error(`Помилка завантаження опцій: ${res.statusText}`);
   return res.json();
+}
+
+export async function suggestAutoRiaOptions(payload: {
+  brand: string;
+  model: string;
+  year: number;
+  bodyType?: string | null;
+  engineType?: string | null;
+}): Promise<SelectedOption[]> {
+  const res = await fetch(`${API_URL}/cars/autoria/options/suggest`, {
+    method: "POST",
+    headers: await authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const msg = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(msg.message ?? "Не вдалося отримати підказку");
+  }
+  const data: { options: SelectedOption[] } = await res.json();
+  return data.options;
 }
 
 export async function createCar(data: Omit<Car, "id" | "createdAt" | "updatedAt" | "priceChangedAt">): Promise<Car> {

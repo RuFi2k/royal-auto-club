@@ -10,6 +10,7 @@ import { putObject, deleteObjectByUrl } from "../../lib/storage";
 import { syncCarTelegramPost, republishCarTelegramPost, deleteCarTelegramPost } from "../telegram/poster";
 import { publishCarToAutoRia, deleteCarAutoRiaAd } from "../autoria/poster";
 import { BINARY_OPTIONS, SELECTABLE_OPTIONS, GROUP_ORDER } from "../autoria/options-catalog";
+import { suggestCarOptions, isSuggestConfigured } from "../autoria/suggest";
 
 export const carsRouter = Router();
 
@@ -147,7 +148,29 @@ carsRouter.get("/", a(async (req, res) => {
 // GET /cars/autoria/options — the AUTO.RIA equipment-options catalog for the UI.
 // Registered before "/:id" so the literal path wins.
 carsRouter.get("/autoria/options", a(async (_req, res) => {
-  res.json({ groups: GROUP_ORDER, binary: BINARY_OPTIONS, selectable: SELECTABLE_OPTIONS });
+  res.json({
+    groups: GROUP_ORDER,
+    binary: BINARY_OPTIONS,
+    selectable: SELECTABLE_OPTIONS,
+    aiEnabled: isSuggestConfigured(),
+  });
+}));
+
+// POST /cars/autoria/options/suggest — AI-suggest options from make/model/year.
+carsRouter.post("/autoria/options/suggest", a(async (req, res) => {
+  const { brand, model, year, bodyType, engineType } = (req.body ?? {}) as Record<string, unknown>;
+  if (!brand || !model || !year) {
+    res.status(400).json({ message: "Вкажіть марку, модель і рік" });
+    return;
+  }
+  const options = await suggestCarOptions({
+    brand: String(brand),
+    model: String(model),
+    year: Number(year),
+    bodyType: bodyType != null ? String(bodyType) : null,
+    engineType: engineType != null ? String(engineType) : null,
+  });
+  res.json({ options });
 }));
 
 // GET /cars/:id
