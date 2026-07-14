@@ -15,11 +15,17 @@ import {
   riaDelete,
   riaUploadPhotos,
   riaPutAdOptionsV2,
+  riaAddAdOptions,
   RIA_DELETE_REASON,
 } from "./client";
 import { resolveCarIds } from "./mapping";
 import { buildAdPayload, buildUpdatePayload } from "./format";
-import { BINARY_V2_BY_ID, SELECTABLE_BY_ID, SELECTABLE_ID_BASE } from "./options-catalog";
+import {
+  BINARY_IDS,
+  BINARY_V2_BY_ID,
+  SELECTABLE_BY_ID,
+  SELECTABLE_ID_BASE,
+} from "./options-catalog";
 
 // Car.vinNumber is stored encrypted; tolerate legacy plaintext rows.
 function carVin(car: Car): string {
@@ -78,23 +84,28 @@ async function uploadPhotos(cfg: AutoRiaConfig, adId: string, urls: string[]): P
 //
 // Selectable options are sent here AND ride along as ad-payload fields; the
 // cabinet UI reads them from the v2 store, so both are needed.
-function desiredAdOptions(options: { optionId: number; valueId: number | null }[]): AdOptionV2[] {
-  const entries: AdOptionV2[] = [];
+function splitAdOptions(options: { optionId: number; valueId: number | null }[]): {
+  v2: AdOptionV2[];
+  legacyOnly: number[];
+} {
+  const v2: AdOptionV2[] = [];
+  const legacyOnly: number[] = [];
   for (const o of options) {
     if (o.valueId === null) {
-      const v2 = BINARY_V2_BY_ID.get(o.optionId);
-      // Undefined = a classic-only option v2 has no equivalent for; AUTO.RIA
-      // cannot display it, so drop it rather than fail the whole PUT.
-      if (v2 !== undefined) entries.push({ optionId: v2, optionValue: 1 });
+      const mapped = BINARY_V2_BY_ID.get(o.optionId);
+      if (mapped !== undefined) v2.push({ optionId: mapped, optionValue: 1 });
+      // No v2 id → publishable only to the legacy table. AUTO.RIA won't render
+      // it, but its search still indexes it, so it keeps the ad filterable.
+      else if (BINARY_IDS.has(o.optionId)) legacyOnly.push(o.optionId);
       continue;
     }
     const sel = SELECTABLE_BY_ID.get(o.optionId);
     const value = sel?.values.find((v) => v.id === o.valueId);
     if (sel && value) {
-      entries.push({ optionId: sel.id - SELECTABLE_ID_BASE, optionValue: value.v2 });
+      v2.push({ optionId: sel.id - SELECTABLE_ID_BASE, optionValue: value.v2 });
     }
   }
-  return entries;
+  return { v2, legacyOnly };
 }
 
 async function syncAdOptions(
@@ -102,8 +113,12 @@ async function syncAdOptions(
   adId: string,
   options: { optionId: number; valueId: number | null }[],
 ): Promise<void> {
+  const { v2, legacyOnly } = splitAdOptions(options);
   try {
-    await riaPutAdOptionsV2(cfg, adId, desiredAdOptions(options));
+    // Order matters: the v2 PUT rewrites the legacy table too, so it would wipe
+    // these ids if it ran second.
+    await riaPutAdOptionsV2(cfg, adId, v2);
+    await riaAddAdOptions(cfg, adId, legacyOnly);
   } catch (err) {
     console.error(`[autoria] sync options failed for ad ${adId}:`, err);
   }

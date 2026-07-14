@@ -136,7 +136,8 @@ export async function riaGetAdOptionsV2(cfg: AutoRiaConfig, adId: string): Promi
   return body as AdOptionV2[];
 }
 
-// Full-set replace: the ad ends up with exactly `entries`.
+// Full-set replace: the ad ends up with exactly `entries`. Also rewrites the
+// legacy table (mapped ids only), so run it BEFORE riaAddAdOptions.
 export async function riaPutAdOptionsV2(
   cfg: AutoRiaConfig,
   adId: string,
@@ -146,6 +147,25 @@ export async function riaPutAdOptionsV2(
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(entries),
+  });
+  await handle(res);
+}
+
+// Legacy write, by classic id. The UI's equipment section won't render these,
+// but AUTO.RIA's SEARCH indexes the legacy table (`auto_options[636]=636`), so
+// this is the only way to publish the options optionsV2 has no id for — they
+// stay filterable even though they aren't displayed. POST is not idempotent:
+// only send ids the ad doesn't already have.
+export async function riaAddAdOptions(
+  cfg: AutoRiaConfig,
+  adId: string,
+  ids: number[],
+): Promise<void> {
+  if (ids.length === 0) return;
+  const res = await fetch(withAuth(cfg, `/auto/used/autos/${adId}/options`, true), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(ids.map((id) => ({ id }))),
   });
   await handle(res);
 }
