@@ -68,8 +68,8 @@ export interface AutoRiaAdPayload {
   damage?: boolean;
   // Selectable options are added dynamically by field name (e.g. seatHeated).
   // NOTE: binary (checkbox) options are NOT part of this payload — the API
-  // ignores an `options` array here; they're managed via the dedicated
-  // options endpoints (see poster.syncAdBinaryOptions).
+  // ignores an `options` array here; all equipment is published through the
+  // dedicated optionsV2 endpoint (see poster.syncAdOptions).
   [field: string]: unknown;
 }
 
