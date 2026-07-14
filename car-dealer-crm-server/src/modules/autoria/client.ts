@@ -110,33 +110,43 @@ export async function riaDelete<T>(
   return (await handle(res)) as T;
 }
 
-// Binary (checkbox) options are managed through dedicated endpoints — the
-// create/update payload's `options` array is ignored by the API.
-export async function riaGetAdOptions(cfg: AutoRiaConfig, adId: string): Promise<number[]> {
-  const res = await fetch(withAuth(cfg, `/auto/used/autos/${adId}/options`, true));
+// Ad equipment. The create/update payload's `options` array is ignored by the
+// API, so equipment is managed through these dedicated endpoints.
+//
+// AUTO.RIA stores it TWICE — a legacy table keyed by classic id, and an
+// optionsV2 table keyed by v2 id — and the cabinet UI renders only the v2 one.
+// Writing via the classic endpoints fills the legacy table ONLY, which is why
+// ads published that way show an empty equipment section. Verified live
+// (2026-07-14) against ad 40153791:
+//   - POST /options (classic ids)   → legacy only; GET /optionsV2 stays []
+//   - PUT  /optionsV2 (v2 entries)  → writes BOTH tables
+//   - DELETE /optionsV2             → clears ALL options, not the ids passed
+// So the v2 PUT is the only correct write, and being a full-set replace it also
+// removes stale options — no read-then-reconcile needed.
+export interface AdOptionV2 {
+  optionId: number;
+  // 1 for a checkbox; the v2 value id for a selectable (e.g. seatHeated).
+  optionValue: number;
+}
+
+export async function riaGetAdOptionsV2(cfg: AutoRiaConfig, adId: string): Promise<AdOptionV2[]> {
+  const res = await fetch(withAuth(cfg, `/auto/used/autos/${adId}/optionsV2`, true));
   const body = await handle(res);
   if (!Array.isArray(body)) return [];
-  return body
-    .map((o) => Number((o as { id?: unknown }).id))
-    .filter((n) => Number.isFinite(n));
+  return body as AdOptionV2[];
 }
 
-export async function riaAddAdOptions(cfg: AutoRiaConfig, adId: string, ids: number[]): Promise<void> {
-  if (ids.length === 0) return;
-  const res = await fetch(withAuth(cfg, `/auto/used/autos/${adId}/options`, true), {
-    method: "POST",
+// Full-set replace: the ad ends up with exactly `entries`.
+export async function riaPutAdOptionsV2(
+  cfg: AutoRiaConfig,
+  adId: string,
+  entries: AdOptionV2[],
+): Promise<void> {
+  const res = await fetch(withAuth(cfg, `/auto/used/autos/${adId}/optionsV2`, true), {
+    method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(ids.map((id) => ({ id }))),
+    body: JSON.stringify(entries),
   });
-  await handle(res);
-}
-
-export async function riaRemoveAdOptions(cfg: AutoRiaConfig, adId: string, ids: number[]): Promise<void> {
-  if (ids.length === 0) return;
-  const res = await fetch(
-    withAuth(cfg, `/auto/used/autos/${adId}/options/${ids.join(",")}`, true),
-    { method: "DELETE" },
-  );
   await handle(res);
 }
 

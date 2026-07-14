@@ -9,18 +9,17 @@ import { decrypt } from "../../lib/encryption";
 import {
   autoriaConfig,
   AutoRiaConfig,
+  AdOptionV2,
   riaPost,
   riaPut,
   riaDelete,
   riaUploadPhotos,
-  riaGetAdOptions,
-  riaAddAdOptions,
-  riaRemoveAdOptions,
+  riaPutAdOptionsV2,
   RIA_DELETE_REASON,
 } from "./client";
 import { resolveCarIds } from "./mapping";
 import { buildAdPayload, buildUpdatePayload } from "./format";
-import { BINARY_IDS } from "./options-catalog";
+import { BINARY_V2_BY_ID, SELECTABLE_BY_ID, SELECTABLE_ID_BASE } from "./options-catalog";
 
 // Car.vinNumber is stored encrypted; tolerate legacy plaintext rows.
 function carVin(car: Car): string {
@@ -73,28 +72,38 @@ async function uploadPhotos(cfg: AutoRiaConfig, adId: string, urls: string[]): P
   }
 }
 
-// Binary (checkbox) options live behind dedicated endpoints, so we reconcile the
-// ad's current set with the car's desired set (add missing, remove stale).
-// Selectable options are not touched here — they ride along in the ad payload.
-async function syncAdBinaryOptions(
+// Equipment lives behind a dedicated endpoint (the ad payload's `options` array
+// is ignored). The v2 PUT is a full-set replace covering both of AUTO.RIA's
+// stores, so we just build the desired set and send it — no reconcile.
+//
+// Selectable options are sent here AND ride along as ad-payload fields; the
+// cabinet UI reads them from the v2 store, so both are needed.
+function desiredAdOptions(options: { optionId: number; valueId: number | null }[]): AdOptionV2[] {
+  const entries: AdOptionV2[] = [];
+  for (const o of options) {
+    if (o.valueId === null) {
+      const v2 = BINARY_V2_BY_ID.get(o.optionId);
+      // Undefined = a classic-only option v2 has no equivalent for; AUTO.RIA
+      // cannot display it, so drop it rather than fail the whole PUT.
+      if (v2 !== undefined) entries.push({ optionId: v2, optionValue: 1 });
+      continue;
+    }
+    const sel = SELECTABLE_BY_ID.get(o.optionId);
+    const value = sel?.values.find((v) => v.id === o.valueId);
+    if (sel && value) {
+      entries.push({ optionId: sel.id - SELECTABLE_ID_BASE, optionValue: value.v2 });
+    }
+  }
+  return entries;
+}
+
+async function syncAdOptions(
   cfg: AutoRiaConfig,
   adId: string,
   options: { optionId: number; valueId: number | null }[],
 ): Promise<void> {
-  const desired = new Set(
-    options.filter((o) => o.valueId === null && BINARY_IDS.has(o.optionId)).map((o) => o.optionId),
-  );
-  let current: number[] = [];
   try {
-    current = await riaGetAdOptions(cfg, adId);
-  } catch (err) {
-    console.error(`[autoria] read options failed for ad ${adId}:`, err);
-  }
-  const toRemove = current.filter((id) => !desired.has(id));
-  const toAdd = [...desired].filter((id) => !current.includes(id));
-  try {
-    await riaRemoveAdOptions(cfg, adId, toRemove);
-    await riaAddAdOptions(cfg, adId, toAdd);
+    await riaPutAdOptionsV2(cfg, adId, desiredAdOptions(options));
   } catch (err) {
     console.error(`[autoria] sync options failed for ad ${adId}:`, err);
   }
@@ -126,7 +135,7 @@ export async function publishCarToAutoRia(carId: number): Promise<{ adId: string
   if (!adId) throw new Error("AUTO.RIA не повернув id оголошення");
 
   await prisma.car.update({ where: { id: car.id }, data: { autoriaAdId: adId } });
-  await syncAdBinaryOptions(cfg, adId, car.options);
+  await syncAdOptions(cfg, adId, car.options);
   await uploadPhotos(cfg, adId, photoUrls(car));
   return { adId };
 }
@@ -159,7 +168,7 @@ async function runSync(carId: number): Promise<void> {
   const ids = await resolveCarIds(cfg, car);
   const payload = buildUpdatePayload(car, ids, carVin(car), car.options);
   await riaPut(cfg, `/auto/used/autos/${car.autoriaAdId}`, payload);
-  await syncAdBinaryOptions(cfg, car.autoriaAdId, car.options);
+  await syncAdOptions(cfg, car.autoriaAdId, car.options);
 }
 
 // Explicit delete (button). Removes the ad and clears the stored id.
