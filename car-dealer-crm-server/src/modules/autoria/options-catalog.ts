@@ -196,6 +196,40 @@ export const SELECTABLE_BY_ID = new Map<number, SelectableOption>(
   SELECTABLE_OPTIONS.map((o) => [o.id, o]),
 );
 
+// Every valid optionId (binary + selectable) — used to validate the public
+// `?options=` filter so unknown ids are silently dropped.
+export const ALL_OPTION_IDS = new Set<number>([
+  ...BINARY_OPTIONS.map((o) => o.id),
+  ...SELECTABLE_OPTIONS.map((o) => o.id),
+]);
+
+// Flat, boolean-only catalog for the public site filter + AI search: selectable
+// options collapse to a single "has feature" checkbox (their value enums are
+// dropped — buyers filter by presence, not exact value). Grouped in GROUP_ORDER.
+export interface FilterOption {
+  id: number;
+  label: string;
+}
+export interface FilterGroup {
+  group: string;
+  options: FilterOption[];
+}
+
+export const FILTER_GROUPS: FilterGroup[] = (() => {
+  const byGroup = new Map<string, FilterOption[]>();
+  for (const g of GROUP_ORDER) byGroup.set(g, []);
+  const push = (group: string, opt: FilterOption) => {
+    if (!byGroup.has(group)) byGroup.set(group, []);
+    byGroup.get(group)!.push(opt);
+  };
+  for (const o of BINARY_OPTIONS) push(o.group, { id: o.id, label: o.label });
+  for (const o of SELECTABLE_OPTIONS) push(o.group, { id: o.id, label: o.label });
+  return GROUP_ORDER.filter((g) => (byGroup.get(g)?.length ?? 0) > 0).map((g) => ({
+    group: g,
+    options: byGroup.get(g)!,
+  }));
+})();
+
 export interface SelectedOption {
   optionId: number;
   valueId: number | null;

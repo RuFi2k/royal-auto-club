@@ -1003,6 +1003,23 @@ form.modal-body .cars-error,
   color: #c53030;
 }
 
+.options-search {
+  width: 100%;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
+  color: #1e293b;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.options-search:focus {
+  border-color: #4a90d9;
+}
+
 /* ── Options tabs (by group) ──────────────────────────────── */
 .options-tabs {
   display: flex;

@@ -28,6 +28,7 @@ export function CarOptionsEditor({ value, onChange, carInfo }: Props) {
   const [suggesting, setSuggesting] = useState(false);
   const [suggestError, setSuggestError] = useState<string | null>(null);
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -116,6 +117,16 @@ export function CarOptionsEditor({ value, onChange, carInfo }: Props) {
 
   const active = groupData.find((g) => g.group === currentGroup);
 
+  // Search overrides the tabs: flat matches (binary + selectable) across groups.
+  const q = search.trim().toLowerCase();
+  const searching = q.length > 0;
+  const matchedSelectable = searching
+    ? catalog.selectable.filter((o) => o.label.toLowerCase().includes(q))
+    : [];
+  const matchedBinary = searching
+    ? catalog.binary.filter((o) => o.label.toLowerCase().includes(q))
+    : [];
+
   return (
     <div className="options-editor">
       {catalog.aiEnabled && (
@@ -138,7 +149,16 @@ export function CarOptionsEditor({ value, onChange, carInfo }: Props) {
         </div>
       )}
 
-      {groupData.length > 0 && (
+      <input
+        type="text"
+        className="options-search"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Пошук опцій…"
+      />
+
+      {/* Tabs — hidden while searching (matches span every group). */}
+      {!searching && groupData.length > 0 && (
         <div className="options-tabs" role="tablist">
           {groupData.map(({ group, binary, selectable }) => {
             const count =
@@ -161,34 +181,69 @@ export function CarOptionsEditor({ value, onChange, carInfo }: Props) {
         </div>
       )}
 
-      {active && (
+      {searching ? (
         <div className="options-group">
-          {active.selectable.length > 0 && (
-            <div className="form-grid">
-              {active.selectable.map((opt) => (
-                <SelectableField
-                  key={opt.id}
-                  option={opt}
-                  value={selectedValueByOption.get(opt.id) ?? null}
-                  onChange={(v) => setSelectable(opt.id, v)}
-                />
-              ))}
-            </div>
-          )}
-
-          {active.binary.length > 0 && (
-            <div className="options-binary-grid">
-              {active.binary.map((opt) => (
-                <BinaryField
-                  key={opt.id}
-                  option={opt}
-                  checked={binaryIds.has(opt.id)}
-                  onToggle={(c) => toggleBinary(opt.id, c)}
-                />
-              ))}
-            </div>
+          {matchedSelectable.length === 0 && matchedBinary.length === 0 ? (
+            <p className="options-hint">Нічого не знайдено</p>
+          ) : (
+            <>
+              {matchedSelectable.length > 0 && (
+                <div className="form-grid">
+                  {matchedSelectable.map((opt) => (
+                    <SelectableField
+                      key={opt.id}
+                      option={opt}
+                      value={selectedValueByOption.get(opt.id) ?? null}
+                      onChange={(v) => setSelectable(opt.id, v)}
+                    />
+                  ))}
+                </div>
+              )}
+              {matchedBinary.length > 0 && (
+                <div className="options-binary-grid">
+                  {matchedBinary.map((opt) => (
+                    <BinaryField
+                      key={opt.id}
+                      option={opt}
+                      checked={binaryIds.has(opt.id)}
+                      onToggle={(c) => toggleBinary(opt.id, c)}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
+      ) : (
+        active && (
+          <div className="options-group">
+            {active.selectable.length > 0 && (
+              <div className="form-grid">
+                {active.selectable.map((opt) => (
+                  <SelectableField
+                    key={opt.id}
+                    option={opt}
+                    value={selectedValueByOption.get(opt.id) ?? null}
+                    onChange={(v) => setSelectable(opt.id, v)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {active.binary.length > 0 && (
+              <div className="options-binary-grid">
+                {active.binary.map((opt) => (
+                  <BinaryField
+                    key={opt.id}
+                    option={opt}
+                    checked={binaryIds.has(opt.id)}
+                    onToggle={(c) => toggleBinary(opt.id, c)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )
       )}
     </div>
   );
