@@ -80,6 +80,7 @@ export interface SelectedOption {
 }
 
 export interface CarFilters {
+  listingStatus?: Car["listingStatus"];
   id?: string;
   brand?: string;
   model?: string;

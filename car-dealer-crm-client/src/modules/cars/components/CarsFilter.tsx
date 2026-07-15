@@ -45,6 +45,12 @@ export function CarsFilter({ filters, onChange }: Props) {
     onChange({});
   }
 
+  function handleDrafts() {
+    const draftFilter: CarFilters = { listingStatus: "draft" };
+    setDraft(draftFilter);
+    onChange(draftFilter);
+  }
+
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter") handleSearch();
   }
@@ -164,6 +170,14 @@ export function CarsFilter({ filters, onChange }: Props) {
       </div>
 
       <div className="filter-actions">
+        <button
+          type="button"
+          className="filter-reset"
+          style={{ background: draft.listingStatus === "draft" ? "#facc15" : undefined, color: draft.listingStatus === "draft" ? "#1a1a2e" : undefined }}
+          onClick={handleDrafts}
+        >
+          Чернетки
+        </button>
         <button className="btn-search" onClick={handleSearch}>Пошук</button>
         <button className="filter-reset" onClick={handleReset}>Скинути</button>
         <button
