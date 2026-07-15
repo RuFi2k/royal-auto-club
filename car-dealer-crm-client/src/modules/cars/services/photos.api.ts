@@ -1,4 +1,3 @@
-import heic2any from "heic2any";
 import type { CarPhoto } from "../types/car.types";
 import { authHeaders, authHeadersNoContentType } from "./api.helpers";
 
@@ -64,39 +63,15 @@ export interface OptimizedUpload {
   optimizedSize: number;
 }
 
-async function toJpegIfHeic(file: File): Promise<File> {
-  const isHeic = file.type.includes("heic") || file.type.includes("heif") || /\.(heic|heif)$/i.test(file.name);
-  if (!isHeic) return file;
-  try {
-    const result = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
-    const blob = Array.isArray(result) ? result[0] : result;
-    return new File([blob], file.name.replace(/\.(heic|heif)$/i, ".jpg"), { type: "image/jpeg" });
-  } catch (err) {
-    console.error("[heic2any] conversion failed:", err);
-    return file;
-  }
-}
-
-async function uploadSinglePhoto(file: File): Promise<OptimizedUpload> {
-  const normalized = await toJpegIfHeic(file);
+export async function uploadOptimizedPhotos(files: File[]): Promise<OptimizedUpload[]> {
+  if (files.length === 0) return [];
   const fd = new FormData();
-  fd.append("files", normalized);
+  for (const f of files) fd.append("files", f);
   const res = await fetch(`${API_URL}/cars/upload-photos`, {
     method: "POST",
     headers: await authHeadersNoContentType(),
     body: fd,
   });
-  if (!res.ok) throw new Error(`Не вдалося завантажити ${normalized.name}`);
-  const results: OptimizedUpload[] = await res.json();
-  return results[0];
-}
-
-export async function uploadOptimizedPhotos(files: File[]): Promise<OptimizedUpload[]> {
-  if (files.length === 0) return [];
-  const results: OptimizedUpload[] = [];
-  for (let i = 0; i < files.length; i += 3) {
-    const batch = await Promise.all(files.slice(i, i + 3).map(uploadSinglePhoto));
-    results.push(...batch);
-  }
-  return results;
+  if (!res.ok) throw new Error("Не вдалося завантажити фото");
+  return res.json();
 }

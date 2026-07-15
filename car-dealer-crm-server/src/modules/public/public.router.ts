@@ -1,7 +1,8 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { Car, CarPhoto, Prisma } from "@prisma/client";
+import { Car, CarOption, CarPhoto, Prisma } from "@prisma/client";
 import { prisma } from "../../db";
 import { requireApiKey } from "../../middleware/api-key.middleware";
+import { ALL_OPTION_IDS, FILTER_GROUPS } from "../autoria/options-catalog";
 
 export const publicRouter = Router();
 
@@ -11,11 +12,23 @@ function str(v: unknown): string | undefined {
   return typeof v === "string" ? v : Array.isArray(v) ? (v[0] as string) : undefined;
 }
 
+// Parse a comma-separated list of known option ids; drop unknown/garbage.
+function parseOptionIds(v: unknown): number[] {
+  const s = str(v);
+  if (!s) return [];
+  const ids = new Set<number>();
+  for (const part of s.split(",")) {
+    const n = parseInt(part.trim(), 10);
+    if (Number.isInteger(n) && ALL_OPTION_IDS.has(n)) ids.add(n);
+  }
+  return [...ids];
+}
+
 function a(fn: (req: Request, res: Response) => Promise<void>) {
   return (req: Request, res: Response, next: NextFunction) => fn(req, res).catch(next);
 }
 
-type CarWithPhotos = Car & { photos: CarPhoto[] };
+type CarWithPhotos = Car & { photos: CarPhoto[]; options?: CarOption[] };
 
 // Strip internal fields and shape photos for public consumption.
 function toPublicCar(car: CarWithPhotos) {
@@ -24,12 +37,11 @@ function toPublicCar(car: CarWithPhotos) {
     vinNumberHash: _hash,
     registrationNumber: _reg,
     ownerPrice: _owner,
-    dealerPrice: _dealer,
-    generalPrice: _general,
     responsiblePerson: _resp,
     priceChangedAt: _pca,
     photos,
     photoUrl,
+    options,
     ...rest
   } = car;
 
@@ -44,7 +56,11 @@ function toPublicCar(car: CarWithPhotos) {
   }
   const coverImage = gallery[0] ?? null;
 
-  return { ...rest, coverImage, gallery, photoUrl: coverImage?.url ?? null };
+  // Flat list of AUTO.RIA option ids the car has (binary + selectable synthetic
+  // ids). The site maps these to labels/groups via GET /public/options-catalog.
+  const optionIds = options ? options.map((o) => o.optionId) : [];
+
+  return { ...rest, coverImage, gallery, photoUrl: coverImage?.url ?? null, options: optionIds };
 }
 
 type ListStatus = "upcoming" | "available" | "sold" | "all";
@@ -67,8 +83,6 @@ const ENGINE_TYPES = new Set([
 ]);
 const GEARBOX_TYPES = new Set(["manual", "automatic", "cvt", "robot", "dual_clutch"]);
 const DRIVETRAINS = new Set(["fwd", "rwd", "awd", "four_wd"]);
-const CABIN_TYPES = new Set(["standard", "extended", "crew_cab", "panoramic"]);
-const CUSTOMS = new Set(["cleared", "not_cleared", "in_progress"]);
 const CAR_ORIGINS = new Set(["EU", "US", "korea", "japan", "china", "other"]);
 const CAR_LOCATIONS = new Set(["owner", "dealership"]);
 const SELL_TYPES = new Set(["retail", "wholesale", "auction", "consignment"]);
@@ -106,7 +120,7 @@ publicRouter.get("/cars", a(async (req, res) => {
   const pmn = q.priceMin ? parseFloat(str(q.priceMin)!) : undefined;
   const pmx = q.priceMax ? parseFloat(str(q.priceMax)!) : undefined;
   if (pmn !== undefined || pmx !== undefined) {
-    where.websitePrice = { ...(pmn !== undefined ? { gte: pmn } : {}), ...(pmx !== undefined ? { lte: pmx } : {}) };
+    where.dealerPrice = { ...(pmn !== undefined ? { gte: pmn } : {}), ...(pmx !== undefined ? { lte: pmx } : {}) };
   }
   const carOrigin = pickEnum(q.carOrigin, CAR_ORIGINS);
   if (carOrigin) where.carOrigin = carOrigin as Prisma.EnumCarOriginFilter;
@@ -127,10 +141,6 @@ publicRouter.get("/cars", a(async (req, res) => {
       ? { in: ["awd", "four_wd"] }
       : (drv as Prisma.EnumDrivetrainFilter);
   }
-  const cabinType = pickEnum(q.cabinType, CABIN_TYPES);
-  if (cabinType) where.cabinType = cabinType as Prisma.EnumCabinTypeFilter;
-  const customsStatus = pickEnum(q.customsStatus, CUSTOMS);
-  if (customsStatus) where.customsStatus = customsStatus as Prisma.EnumCustomsStatusFilter;
   const sellType = pickEnum(q.sellType, SELL_TYPES);
   if (sellType) where.sellType = sellType as Prisma.EnumSellTypeFilter;
   if (str(q.isCryptoAvailable) !== undefined) {
@@ -158,6 +168,12 @@ publicRouter.get("/cars", a(async (req, res) => {
     where.seatsCount = { ...(sMin !== undefined ? { gte: sMin } : {}), ...(sMax !== undefined ? { lte: sMax } : {}) };
   }
 
+  // Equipment options — AND semantics: car must have every requested option id.
+  const optionIds = parseOptionIds(q.options);
+  if (optionIds.length > 0) {
+    where.AND = optionIds.map((id) => ({ options: { some: { optionId: id } } }));
+  }
+
   // Free-text — ILIKE across visible columns. Cheap; revisit with tsvector when catalog grows.
   const text = str(q.q);
   if (text) {
@@ -183,7 +199,7 @@ publicRouter.get("/cars", a(async (req, res) => {
   const [data, total] = await Promise.all([
     prisma.car.findMany({
       where,
-      include: { photos: true },
+      include: { photos: true, options: true },
       orderBy,
       skip: (pg - 1) * ps,
       take: ps,
@@ -206,11 +222,23 @@ publicRouter.get("/cars/:id", a(async (req, res) => {
   if (isNaN(id)) { res.status(400).json({ message: "Invalid id" }); return; }
   const car = await prisma.car.findUnique({
     where: { id },
-    include: { photos: true },
+    include: { photos: true, options: true },
   });
   if (!car || car.listingStatus === "draft" || car.listingStatus === "archived") {
     res.status(404).json({ message: "Car not found" });
     return;
   }
   res.json(toPublicCar(car as CarWithPhotos));
+}));
+
+// Groups that are seller/back-office flags (e.g. "Авто в кредиті", "Перший
+// власник", "Сервісна книжка") — irrelevant as public buyer filters, so they're
+// hidden from the site catalog + AI reference. The CRM editor keeps them (it
+// posts them to AUTO.RIA) via its own /cars/autoria/options endpoint.
+const PUBLIC_HIDDEN_OPTION_GROUPS = new Set(["Стан"]);
+
+// GET /public/options-catalog — the AUTO.RIA equipment catalog (grouped, boolean)
+// that backs the site's equipment filter and AI search. Static per deploy.
+publicRouter.get("/options-catalog", a(async (_req, res) => {
+  res.json({ groups: FILTER_GROUPS.filter((g) => !PUBLIC_HIDDEN_OPTION_GROUPS.has(g.group)) });
 }));

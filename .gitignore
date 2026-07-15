@@ -24,3 +24,6 @@ Thumbs.db
 .idea/
 
 .vercel
+
+# Scraped listing data used only for local seeding (bulk binaries)
+seed/

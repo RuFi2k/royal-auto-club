@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { createCar, updateCar } from "../services/cars.api";
 import { uploadCarFile } from "../services/storage";
 import { uploadOptimizedPhotos } from "../services/photos.api";
-import type { Car } from "../types/car.types";
+import type { Car, SelectedOption } from "../types/car.types";
 import { CRASH_BODY_PARTS, CRASH_BODY_PART_LABELS } from "../lib/crash-body-parts";
 import { PhotoGalleryModal } from "./PhotoGalleryModal";
 import { RichTextEditor } from "./RichTextEditor";
+import { CarOptionsEditor } from "./CarOptionsEditor";
 
 type StagedPhoto = {
   key: string;       // local stable id
@@ -35,17 +36,13 @@ const DEFAULTS: FormData = {
   bodyType: "sedan",
   doorsCount: 4,
   seatsCount: 5,
-  cabinType: "standard",
-  customsStatus: "cleared",
   carOrigin: "EU",
   carLocation: "dealership",
   location: "",
   sellType: "retail",
   isCryptoAvailable: false,
   ownerPrice: 0,
-  websitePrice: 0,
   dealerPrice: 0,
-  generalPrice: 0,
   isAvailable: false,
   responsiblePerson: "",
   listingStatus: "draft",
@@ -62,6 +59,7 @@ const DEFAULTS: FormData = {
   airbagReplaced: false,
   crashDetails: null,
   crashBodyParts: [],
+  options: [],
 };
 
 
@@ -77,7 +75,7 @@ function carToForm(car: Car): FormData {
     vinNumber: car.vinNumber, registrationNumber: car.registrationNumber,
     countryOfRegistration: car.countryOfRegistration, engineType: car.engineType,
     gearboxType: car.gearboxType, drivetrain: car.drivetrain, bodyType: car.bodyType,
-    cabinType: car.cabinType, customsStatus: car.customsStatus, carOrigin: car.carOrigin,
+    carOrigin: car.carOrigin,
     carLocation: car.carLocation, location: car.location, sellType: car.sellType,
     isCryptoAvailable: car.isCryptoAvailable, isAvailable: car.isAvailable,
     responsiblePerson: car.responsiblePerson,
@@ -87,13 +85,24 @@ function carToForm(car: Car): FormData {
     photoUrl: car.photoUrl, techPassportUrl: car.techPassportUrl, defectsCheckUrl: car.defectsCheckUrl,
     accidentFree: car.accidentFree, crashed: car.crashed, airbagReplaced: car.airbagReplaced,
     crashDetails: car.crashDetails, crashBodyParts: [...(car.crashBodyParts ?? [])],
+    options: (car.options ?? []).map((o) => ({ optionId: o.optionId, valueId: o.valueId })),
     // Normalize Prisma Decimal / numeric fields to avoid false positives
     year: Number(car.year), mileage: Number(car.mileage),
     engineVolume: Number(car.engineVolume), enginePower: Number(car.enginePower),
     doorsCount: Number(car.doorsCount), seatsCount: Number(car.seatsCount),
-    ownerPrice: Number(car.ownerPrice), websitePrice: Number(car.websitePrice),
-    dealerPrice: Number(car.dealerPrice), generalPrice: Number(car.generalPrice),
+    ownerPrice: Number(car.ownerPrice), dealerPrice: Number(car.dealerPrice),
   };
+}
+
+function optionsKey(options: SelectedOption[] = []): string {
+  return options
+    .map((o) => `${o.optionId}:${o.valueId ?? "null"}`)
+    .sort()
+    .join("|");
+}
+
+function optionsChanged(current: SelectedOption[] = [], initial: SelectedOption[] = []): boolean {
+  return optionsKey(current) !== optionsKey(initial);
 }
 
 function getChangedFields(current: FormData, initial: FormData): Partial<FormData> {
@@ -178,6 +187,11 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
       let saved: Car;
       if (car) {
         const changes = getChangedFields(formWithFiles, initialForm.current);
+        // Options are compared by set (order-independent), not the generic diff.
+        delete changes.options;
+        if (optionsChanged(form.options, initialForm.current.options)) {
+          changes.options = form.options ?? [];
+        }
         if (Object.keys(changes).length === 0) {
           onSaved(car);
           return;
@@ -273,7 +287,7 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
                 <input required {...numProps("year")} />
               </div>
               <div className="form-field">
-                <label>Пробіг (км) *</label>
+                <label>Пробіг (тис. км) *</label>
                 <input required {...numProps("mileage", { min: 0 })} />
               </div>
               <div className="form-field">
@@ -367,29 +381,12 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
                 <label>Місць</label>
                 <input {...numProps("seatsCount", { min: 1, max: 12 })} />
               </div>
-              <div className="form-field">
-                <label>Тип кабіни</label>
-                <select value={form.cabinType} onChange={(e) => set("cabinType", e.target.value)}>
-                  <option value="standard">Стандарт</option>
-                  <option value="extended">Подовжена</option>
-                  <option value="crew_cab">Подвійна кабіна</option>
-                  <option value="panoramic">Панорамна</option>
-                </select>
-              </div>
             </div>
           </section>
 
           <section className="form-section">
             <h3>Статус і логістика</h3>
             <div className="form-grid">
-              <div className="form-field">
-                <label>Статус розмитнення</label>
-                <select value={form.customsStatus} onChange={(e) => set("customsStatus", e.target.value)}>
-                  <option value="cleared">Розмитнено</option>
-                  <option value="not_cleared">Не розмитнено</option>
-                  <option value="in_progress">В процесі</option>
-                </select>
-              </div>
               <div className="form-field">
                 <label>Походження авто</label>
                 <select value={form.carOrigin} onChange={(e) => set("carOrigin", e.target.value)}>
@@ -404,7 +401,7 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
               <div className="form-field">
                 <label>Розташування авто</label>
                 <select value={form.carLocation} onChange={(e) => set("carLocation", e.target.value)}>
-                  <option value="dealership">Автосалон</option>
+                  <option value="dealership">Площадка</option>
                   <option value="owner">Власник</option>
                 </select>
               </div>
@@ -432,16 +429,8 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
                 <input {...numProps("ownerPrice", { min: 0 })} />
               </div>
               <div className="form-field">
-                <label>Ціна на сайті ($)</label>
-                <input {...numProps("websitePrice", { min: 0 })} />
-              </div>
-              <div className="form-field">
                 <label>Ціна для дилерів ($)</label>
                 <input {...numProps("dealerPrice", { min: 0 })} />
-              </div>
-              <div className="form-field">
-                <label>Загальна ціна ($)</label>
-                <input {...numProps("generalPrice", { min: 0 })} />
               </div>
               <div className="form-field form-field-checkbox">
                 <label>
@@ -462,7 +451,7 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
             </div>
           </section>
 
-          <section className="form-section">
+          <section className="form-section form-section-wide">
             <h3>Опис</h3>
             <div className="form-field">
               <label>Короткий опис (один рядок)</label>
@@ -553,7 +542,7 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
             </div>
           </section>
 
-          <section className="form-section">
+          <section className="form-section form-section-wide">
             <h3>Історія ремонту</h3>
             <div className="form-grid">
               <div className="form-field form-field-checkbox">
@@ -666,7 +655,22 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
             )}
           </section>
 
-          <section className="form-section">
+          <section className="form-section form-section-wide">
+            <h3>Опції (AUTO.RIA)</h3>
+            <CarOptionsEditor
+              value={form.options ?? []}
+              onChange={(next) => set("options", next)}
+              carInfo={{
+                brand: form.brand,
+                model: form.model,
+                year: form.year,
+                bodyType: form.bodyType,
+                engineType: form.engineType,
+              }}
+            />
+          </section>
+
+          <section className="form-section form-section-wide">
             <h3>Галерея</h3>
             {isCreate ? (
               <>

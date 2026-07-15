@@ -6,7 +6,11 @@ import { prisma } from "../../db";
 import { requireAuth, AuthRequest } from "../../middleware/auth.middleware";
 import { sanitizeRichText } from "../../lib/sanitize-html";
 import { optimizeAndUpload } from "./photo-upload";
+import { putObject, deleteObjectByUrl } from "../../lib/storage";
 import { syncCarTelegramPost, republishCarTelegramPost, deleteCarTelegramPost } from "../telegram/poster";
+import { publishCarToAutoRia, deleteCarAutoRiaAd } from "../autoria/poster";
+import { BINARY_OPTIONS, SELECTABLE_OPTIONS, GROUP_ORDER } from "../autoria/options-catalog";
+import { suggestCarOptions, isSuggestConfigured } from "../autoria/suggest";
 
 export const carsRouter = Router();
 
@@ -16,7 +20,7 @@ const photoUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024, files: 30 },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith("image/") || file.mimetype === "application/octet-stream") cb(null, true);
+    if (file.mimetype.startsWith("image/")) cb(null, true);
     else cb(new Error("Only image files are allowed"));
   },
 });
@@ -25,6 +29,19 @@ const photoUpload = multer({
 // instead of falling through to the global 500 handler.
 function uploadMiddleware(req: Request, res: Response, next: NextFunction) {
   photoUpload.array("files", 30)(req, res, (err) => {
+    if (err) { res.status(400).json({ message: err.message ?? "Upload failed" }); return; }
+    next();
+  });
+}
+
+// Generic single-file upload (tech passports, defect-check scans, photo archives).
+// No image filter — accepts pdf / zip / images. Stored to object storage as-is.
+const fileUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024 },
+});
+function singleFileMiddleware(req: Request, res: Response, next: NextFunction) {
+  fileUpload.single("file")(req, res, (err) => {
     if (err) { res.status(400).json({ message: err.message ?? "Upload failed" }); return; }
     next();
   });
@@ -69,12 +86,21 @@ carsRouter.post("/upload-photos", uploadMiddleware, a(async (req, res) => {
   if (files.length === 0) { res.status(400).json({ message: "No files" }); return; }
   const results = await Promise.all(
     files.map((f) => optimizeAndUpload(f.buffer, f.originalname))
-  ).catch((err) => {
-    const status = (err as { statusCode?: number }).statusCode ?? 500;
-    res.status(status).json({ message: err.message ?? "Upload failed" });
-    return null;
-  });
-  if (results) res.json(results);
+  );
+  res.json(results);
+}));
+
+// POST /cars/upload-file?folder=tech-passports — single non-image file upload
+// (tech passport, defect check, photo archive). Returns { url, filename }.
+// MUST be before /:id to avoid "upload-file" matching as an id.
+carsRouter.post("/upload-file", singleFileMiddleware, a(async (req, res) => {
+  const file = req.file;
+  if (!file) { res.status(400).json({ message: "No file" }); return; }
+  const folder = (str(req.query.folder) ?? "misc").replace(/[^a-z0-9-]/gi, "") || "misc";
+  const ext = (file.originalname.split(".").pop() ?? "bin").toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
+  const key = `cars/${folder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  const url = await putObject(key, file.buffer, file.mimetype || "application/octet-stream");
+  res.json({ url, filename: file.originalname });
 }));
 
 // GET /cars/audit-logs — MUST be before /:id to avoid "audit-logs" matching as an id
@@ -108,8 +134,6 @@ carsRouter.get("/", a(async (req, res) => {
     engineType: str(q.engineType),
     gearboxType: str(q.gearboxType),
     drivetrain: str(q.drivetrain),
-    cabinType: str(q.cabinType),
-    customsStatus: str(q.customsStatus),
     sellType: str(q.sellType),
     yearMin: q.yearMin ? parseInt(str(q.yearMin)!, 10) : undefined,
     yearMax: q.yearMax ? parseInt(str(q.yearMax)!, 10) : undefined,
@@ -126,6 +150,34 @@ carsRouter.get("/", a(async (req, res) => {
   res.json(result);
 }));
 
+// GET /cars/autoria/options — the AUTO.RIA equipment-options catalog for the UI.
+// Registered before "/:id" so the literal path wins.
+carsRouter.get("/autoria/options", a(async (_req, res) => {
+  res.json({
+    groups: GROUP_ORDER,
+    binary: BINARY_OPTIONS,
+    selectable: SELECTABLE_OPTIONS,
+    aiEnabled: isSuggestConfigured(),
+  });
+}));
+
+// POST /cars/autoria/options/suggest — AI-suggest options from make/model/year.
+carsRouter.post("/autoria/options/suggest", a(async (req, res) => {
+  const { brand, model, year, bodyType, engineType } = (req.body ?? {}) as Record<string, unknown>;
+  if (!brand || !model || !year) {
+    res.status(400).json({ message: "Вкажіть марку, модель і рік" });
+    return;
+  }
+  const options = await suggestCarOptions({
+    brand: String(brand),
+    model: String(model),
+    year: Number(year),
+    bodyType: bodyType != null ? String(bodyType) : null,
+    engineType: engineType != null ? String(engineType) : null,
+  });
+  res.json({ options });
+}));
+
 // GET /cars/:id
 carsRouter.get("/:id", a(async (req, res) => {
   const id = parseInt(req.params.id as string, 10);
@@ -137,8 +189,9 @@ carsRouter.get("/:id", a(async (req, res) => {
 
 // POST /cars
 carsRouter.post("/", a(async (req, res) => {
-  const { photos, ...carInput } = (req.body ?? {}) as Record<string, unknown> & {
+  const { photos, options, ...carInput } = (req.body ?? {}) as Record<string, unknown> & {
     photos?: Array<{ url: string; alt?: string | null }>;
+    options?: Array<{ optionId: number; valueId?: number | null }>;
   };
 
   // Denormalize cover from gallery if explicit photoUrl wasn't provided.
@@ -162,9 +215,13 @@ carsRouter.post("/", a(async (req, res) => {
     );
   }
 
+  if (Array.isArray(options)) {
+    await CarsService.replaceOptions(car.id, options);
+  }
+
   const withPhotos = await prisma.car.findUnique({
     where: { id: car.id },
-    include: { photos: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] } },
+    include: { photos: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] }, options: true },
   });
   syncCarTelegramPost(car.id);
   res.status(201).json(withPhotos ?? car);
@@ -174,12 +231,18 @@ carsRouter.post("/", a(async (req, res) => {
 carsRouter.patch("/:id", a(async (req, res) => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) { res.status(400).json({ message: "Invalid id" }); return; }
-  const body = (req.body ?? {}) as Record<string, unknown>;
+  const { options, ...body } = (req.body ?? {}) as Record<string, unknown> & {
+    options?: Array<{ optionId: number; valueId?: number | null }>;
+  };
   if ("description" in body) {
     body.description = sanitizeRichText(body.description);
   }
-  const car = await CarsService.update(id, body, uid(req));
-  res.json(car);
+  // Replace options first so update()'s AUTO.RIA sync posts the fresh set.
+  if (Array.isArray(options)) {
+    await CarsService.replaceOptions(id, options);
+  }
+  await CarsService.update(id, body, uid(req));
+  res.json(await CarsService.getById(id));
 }));
 
 // PATCH /cars/:id/availability
@@ -225,6 +288,32 @@ carsRouter.delete("/:id/telegram", a(async (req, res) => {
   }
 }));
 
+// POST /cars/:id/autoria/publish — create or recreate the AUTO.RIA advertisement
+carsRouter.post("/:id/autoria/publish", a(async (req, res) => {
+  const id = parseInt(req.params.id as string, 10);
+  if (isNaN(id)) { res.status(400).json({ message: "Invalid id" }); return; }
+  try {
+    const result = await publishCarToAutoRia(id);
+    res.json(result);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "AUTO.RIA publish failed";
+    res.status(400).json({ message: msg });
+  }
+}));
+
+// DELETE /cars/:id/autoria — delete the AUTO.RIA ad and clear the stored id
+carsRouter.delete("/:id/autoria", a(async (req, res) => {
+  const id = parseInt(req.params.id as string, 10);
+  if (isNaN(id)) { res.status(400).json({ message: "Invalid id" }); return; }
+  try {
+    await deleteCarAutoRiaAd(id);
+    res.status(204).send();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "AUTO.RIA delete failed";
+    res.status(400).json({ message: msg });
+  }
+}));
+
 // GET /cars/:id/photos — gallery, sorted by sortOrder asc
 carsRouter.get("/:id/photos", a(async (req, res) => {
   const carId = parseInt(req.params.id as string, 10);
@@ -235,6 +324,14 @@ carsRouter.get("/:id/photos", a(async (req, res) => {
   });
   res.json(photos);
 }));
+
+async function syncCoverPhoto(carId: number): Promise<void> {
+  const first = await prisma.carPhoto.findFirst({
+    where: { carId },
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+  });
+  await prisma.car.update({ where: { id: carId }, data: { photoUrl: first?.url ?? null } });
+}
 
 // POST /cars/:id/photos — append a photo to the gallery
 carsRouter.post("/:id/photos", a(async (req, res) => {
@@ -248,6 +345,7 @@ carsRouter.post("/:id/photos", a(async (req, res) => {
   const photo = await prisma.carPhoto.create({
     data: { carId, url, alt: alt ?? null, sortOrder: next },
   });
+  await syncCoverPhoto(carId);
   syncCarTelegramPost(carId);
   res.status(201).json(photo);
 }));
@@ -284,6 +382,7 @@ carsRouter.put("/:id/photos/order", a(async (req, res) => {
     where: { carId },
     orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
   });
+  await prisma.car.update({ where: { id: carId }, data: { photoUrl: photos[0]?.url ?? null } });
   syncCarTelegramPost(carId);
   res.json(photos);
 }));
@@ -293,7 +392,10 @@ carsRouter.delete("/:id/photos/:photoId", a(async (req, res) => {
   const carId = parseInt(req.params.id as string, 10);
   const photoId = parseInt(req.params.photoId as string, 10);
   if (isNaN(carId) || isNaN(photoId)) { res.status(400).json({ message: "Invalid id" }); return; }
+  const existing = await prisma.carPhoto.findUnique({ where: { id: photoId } });
   await prisma.carPhoto.delete({ where: { id: photoId, carId } });
+  await deleteObjectByUrl(existing?.url);
+  await syncCoverPhoto(carId);
   syncCarTelegramPost(carId);
   res.status(204).send();
 }));
@@ -323,6 +425,8 @@ carsRouter.delete("/:id/archives/:archiveId", a(async (req, res) => {
   const carId = parseInt(req.params.id as string, 10);
   const archiveId = parseInt(req.params.archiveId as string, 10);
   if (isNaN(carId) || isNaN(archiveId)) { res.status(400).json({ message: "Invalid id" }); return; }
+  const existing = await prisma.carPhotoArchive.findUnique({ where: { id: archiveId } });
   await prisma.carPhotoArchive.delete({ where: { id: archiveId, carId } });
+  await deleteObjectByUrl(existing?.url);
   res.status(204).send();
 }));

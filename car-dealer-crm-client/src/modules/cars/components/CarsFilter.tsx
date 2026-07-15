@@ -7,8 +7,7 @@ interface Props {
 }
 
 const EXTENDED_KEYS: Array<keyof CarFilters> = [
-  "bodyType", "engineType", "gearboxType", "drivetrain", "cabinType",
-  "customsStatus", "sellType",
+  "bodyType", "engineType", "gearboxType", "drivetrain", "sellType",
   "yearMin", "yearMax",
   "enginePowerMin", "enginePowerMax",
   "engineVolumeMin", "engineVolumeMax",
@@ -87,7 +86,7 @@ export function CarsFilter({ filters, onChange }: Props) {
       </div>
 
       <div className="filter-field">
-        <label>Пробіг (км)</label>
+        <label>Пробіг (тис. км)</label>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <input
             type="number"
@@ -110,7 +109,7 @@ export function CarsFilter({ filters, onChange }: Props) {
       </div>
 
       <div className="filter-field">
-        <label>Ціна на сайті ($)</label>
+        <label>Ціна ($)</label>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           <input
             type="number"
@@ -149,7 +148,7 @@ export function CarsFilter({ filters, onChange }: Props) {
         <label>Розташування</label>
         <select value={draft.carLocation ?? ""} onChange={(e) => set("carLocation", e.target.value)}>
           <option value="">Усі</option>
-          <option value="dealership">Автосалон</option>
+          <option value="dealership">Площадка</option>
           <option value="owner">Власник</option>
         </select>
       </div>
@@ -242,16 +241,6 @@ export function CarsFilter({ filters, onChange }: Props) {
               <option value="wholesale">Гурт</option>
               <option value="auction">Аукціон</option>
               <option value="consignment">Консигнація</option>
-            </select>
-          </div>
-
-          <div className="filter-field">
-            <label>Розмитнення</label>
-            <select value={draft.customsStatus ?? ""} onChange={(e) => set("customsStatus", e.target.value)}>
-              <option value="">Усі</option>
-              <option value="cleared">Розмитнено</option>
-              <option value="not_cleared">Не розмитнено</option>
-              <option value="in_progress">В процесі</option>
             </select>
           </div>
 

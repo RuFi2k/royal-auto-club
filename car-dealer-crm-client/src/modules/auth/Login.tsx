@@ -1,7 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./AuthProvider";
-import { sendPasswordResetEmail } from "firebase/auth";
-import { auth } from "./firebase";
+import { authClient } from "./auth-client";
 import { useState } from "react";
 import "./login.css";
 
@@ -32,7 +31,10 @@ export function Login() {
     setSubmitting(true);
     setError(null);
     try {
-      await sendPasswordResetEmail(auth, email);
+      await authClient.forgetPassword({
+        email,
+        redirectTo: `${window.location.origin}/login`,
+      });
       setResetSent(true);
     } catch {
       setError("Не вдалося надіслати лист. Перевірте email.");
@@ -64,9 +66,10 @@ export function Login() {
       // After registration user is logged in but pending — ProtectedRoute will show pending screen
       navigate("/listings");
     } catch (err: any) {
-      if (err.code === "auth/email-already-in-use") {
+      const code = String(err?.message ?? "").toUpperCase();
+      if (code.includes("EXIST") || code.includes("ALREADY")) {
         setError("Цей email вже зареєстровано.");
-      } else if (err.code === "auth/weak-password") {
+      } else if (code.includes("PASSWORD")) {
         setError("Пароль повинен містити не менше 6 символів.");
       } else {
         setError("Помилка реєстрації. Спробуйте ще раз.");

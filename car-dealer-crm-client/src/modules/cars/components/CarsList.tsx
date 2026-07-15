@@ -59,14 +59,8 @@ const DRIVETRAIN: Record<string, string> = {
 };
 
 const CAR_LOCATION: Record<string, string> = {
-  dealership: "Автосалон",
+  dealership: "Площадка",
   owner: "Власник",
-};
-
-const CUSTOMS: Record<string, string> = {
-  cleared: "Розмитнено",
-  not_cleared: "Не розмитнено",
-  in_progress: "В процесі",
 };
 
 const LISTING_STATUS: Record<Car["listingStatus"], { label: string; cls: string }> = {
@@ -146,7 +140,7 @@ export function CarsList({ cars, loading, onView, onEdit, onToggleAvailability, 
             <div className="car-row-line">
               <span className="row-tag">{car.year}</span>
               <span className="row-sep">·</span>
-              <span className="row-tag">{car.mileage.toLocaleString("uk-UA")} км</span>
+              <span className="row-tag">{car.mileage} тис. км</span>
               <span className="row-sep">·</span>
               <span className="row-tag">{car.color}</span>
               <span className="row-sep">·</span>
@@ -176,10 +170,6 @@ export function CarsList({ cars, loading, onView, onEdit, onToggleAvailability, 
               <span className="row-sep">·</span>
               <span className="row-tag">{CAR_LOCATION[car.carLocation] ?? car.carLocation}</span>
               <span className="row-sep">·</span>
-              <span className={`badge badge-customs-${car.customsStatus.replace(/_/g, "-")}`}>
-                {CUSTOMS[car.customsStatus] ?? car.customsStatus}
-              </span>
-              <span className="row-sep">·</span>
               <span className="row-tag row-location">{car.location}</span>
             </div>
 
@@ -202,8 +192,7 @@ export function CarsList({ cars, loading, onView, onEdit, onToggleAvailability, 
             {/* Line 5 — prices + responsible */}
             <div className="car-row-footer">
               <div className="car-row-prices">
-                <span className="price-main">{fmt(car.websitePrice)}</span>
-                <span className="price-sub">Дилер: {fmt(car.dealerPrice)}</span>
+                <span className="price-main">{fmt(car.dealerPrice)}</span>
                 <span className="price-sub">Власник: {fmt(car.ownerPrice)}</span>
                 {car.isCryptoAvailable && <span className="badge badge-crypto">Крипто</span>}
                 {car.priceChangedAt && (

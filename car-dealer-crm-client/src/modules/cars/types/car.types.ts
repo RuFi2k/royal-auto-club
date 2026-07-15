@@ -16,17 +16,13 @@ export interface Car {
   bodyType: string;
   doorsCount: number;
   seatsCount: number;
-  cabinType: string;
-  customsStatus: string;
   carOrigin: string;
   carLocation: string;
   location: string;
   sellType: string;
   isCryptoAvailable: boolean;
   ownerPrice: number;
-  websitePrice: number;
   dealerPrice: number;
-  generalPrice: number;
   isAvailable: boolean;
   responsiblePerson: string;
   shortDescription: string | null;
@@ -46,8 +42,41 @@ export interface Car {
   defectsCheckUrl: string | null;
   priceChangedAt: string | null;
   telegramMessageId?: number | null;
+  autoriaAdId?: string | null;
+  options?: SelectedOption[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SelectableValue {
+  id: number;
+  label: string;
+}
+
+export interface BinaryOption {
+  id: number;
+  label: string;
+  group: string;
+}
+
+export interface SelectableOption {
+  id: number;
+  field: string;
+  label: string;
+  group: string;
+  values: SelectableValue[];
+}
+
+export interface AutoRiaOptionsCatalog {
+  groups: string[];
+  binary: BinaryOption[];
+  selectable: SelectableOption[];
+  aiEnabled?: boolean;
+}
+
+export interface SelectedOption {
+  optionId: number;
+  valueId: number | null;
 }
 
 export interface CarFilters {
@@ -66,8 +95,6 @@ export interface CarFilters {
   engineType?: string;
   gearboxType?: string;
   drivetrain?: string;
-  cabinType?: string;
-  customsStatus?: string;
   sellType?: string;
   yearMin?: string;
   yearMax?: string;
