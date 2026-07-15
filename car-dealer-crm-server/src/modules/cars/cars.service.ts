@@ -223,6 +223,12 @@ export const CarsService = {
   async update(id: number, data: CarUpdateInput, userId: string): Promise<Car> {
     const before = await prisma.car.findUnique({ where: { id } });
     if (!before) throw Object.assign(new Error("Car not found"), { status: 404 });
+    if (
+      before.listingStatus !== "draft" &&
+      (data as Record<string, unknown>).listingStatus === "draft"
+    ) {
+      throw Object.assign(new Error("Опубліковане авто не можна повернути в чернетки"), { status: 400 });
+    }
 
     const priceFields = ["ownerPrice", "websitePrice", "dealerPrice", "generalPrice"];
     const touchesPrice = priceFields.some((f) => f in data);

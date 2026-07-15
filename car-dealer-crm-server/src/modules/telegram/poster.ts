@@ -45,7 +45,9 @@ export async function republishCarTelegramPost(carId: number): Promise<{ message
     include: { photos: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] } },
   });
   if (!car) throw new Error("Car not found");
-  if (car.listingStatus === "archived") throw new Error("Архівні авто не публікуються в Telegram");
+  if (car.listingStatus === "draft" || car.listingStatus === "archived") {
+    throw new Error("Чернетки та архівні авто не публікуються в Telegram");
+  }
 
   if (car.telegramMessageId) {
     await deleteMessage(cfg.token, cfg.chatId, car.telegramMessageId);
@@ -92,9 +94,9 @@ async function runSync(carId: number): Promise<void> {
   });
   if (!car) return;
 
-  // Don't post archived cars. If a previously-posted car gets archived, leave the
+  // Don't post draft or archived cars. If a previously-posted car gets archived, leave the
   // existing post alone (caller can delete manually if needed).
-  if (car.listingStatus === "archived") return;
+  if (car.listingStatus === "draft" || car.listingStatus === "archived") return;
 
   const caption = buildCarCaption(car, { siteUrl: cfg.siteUrl });
 

@@ -40,6 +40,7 @@ const DRIVETRAIN_UA: Record<string, string> = {
 };
 
 const STATUS_HEADER: Record<ListingStatus, string> = {
+  draft: "",
   available: "✅ <b>В наявності</b>",
   upcoming: "🚚 <b>В дорозі</b>",
   sold: "🔴 <b>Продано</b>",
