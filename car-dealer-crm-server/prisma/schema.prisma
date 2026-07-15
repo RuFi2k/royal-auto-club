@@ -73,8 +73,9 @@ enum CarLocationStatus {
 // sync (true ⇔ status==available) for backward compatibility with existing
 // queries; once all consumers move to listingStatus we can drop isAvailable.
 enum ListingStatus {
+  draft      // saved in CRM, but not published yet
   upcoming   // ordered or in transit; not yet for sale
-  available  // for sale right now (the default)
+  available  // for sale right now
   sold       // sold; soldAt is set
   archived   // hidden from public listings (admin-only)
 }
@@ -124,12 +125,12 @@ model Car {
   isCryptoAvailable    Boolean           @default(false)
   ownerPrice           Decimal           @db.Decimal(12, 2) // price the owner wants
   dealerPrice          Decimal           @db.Decimal(12, 2) // public asking price (site, Telegram, AUTO.RIA)
-  isAvailable          Boolean           @default(true)
+  isAvailable          Boolean           @default(false)
   soldAt               DateTime?         // set when isAvailable flips true→false; cleared on re-listing
 
-  // Lifecycle (upcoming / available / sold / archived). Defaults to available
-  // so existing rows keep behaving as before.
-  listingStatus        ListingStatus     @default(available)
+  // Lifecycle (draft / upcoming / available / sold / archived). New rows default
+  // to an unpublished draft; the migration leaves existing rows unchanged.
+  listingStatus        ListingStatus     @default(draft)
   eta                  DateTime?         // expected arrival; meaningful only when listingStatus=upcoming
   transitStage         TransitStage?     // current logistics step; null for non-upcoming cars
   estimatedPrice       Decimal?          @db.Decimal(12, 2) // tentative price while in transit

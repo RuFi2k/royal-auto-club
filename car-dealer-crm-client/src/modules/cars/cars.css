@@ -630,6 +630,16 @@
   color: #276749;
 }
 
+.badge-draft {
+  background: #edf2f7;
+  color: #4a5568;
+}
+
+.badge-upcoming {
+  background: #fefcbf;
+  color: #744210;
+}
+
 .badge-unavailable {
   background: #fed7d7;
   color: #9b2c2c;
@@ -751,6 +761,17 @@
   font-weight: 600;
   color: #1a1a2e;
   margin: 0;
+}
+
+.modal-header-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.save-state {
+  color: #718096;
+  font-size: 11px;
 }
 
 .modal-close {
@@ -1364,4 +1385,3 @@ form.modal-body .cars-error,
   border-radius: 10px;
   background: #0e0e16;
 }
-

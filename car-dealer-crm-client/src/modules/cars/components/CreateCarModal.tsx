@@ -15,7 +15,7 @@ type StagedPhoto = {
   alt: string;
 };
 
-const DRAFT_KEY = "car-form-draft";
+const DRAFT_KEY = "car-form-draft-v2";
 
 type FormData = Omit<Car, "id" | "createdAt" | "updatedAt" | "priceChangedAt">;
 
@@ -43,9 +43,9 @@ const DEFAULTS: FormData = {
   isCryptoAvailable: false,
   ownerPrice: 0,
   dealerPrice: 0,
-  isAvailable: true,
+  isAvailable: false,
   responsiblePerson: "",
-  listingStatus: "available",
+  listingStatus: "draft",
   eta: null,
   transitStage: null,
   estimatedPrice: null,
@@ -256,7 +256,16 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && handleClose()}>
       <div className="modal">
         <div className="modal-header">
-          <h2>{car ? `Редагування — ${car.brand} ${car.model}` : "Нове оголошення"}</h2>
+          <div className="modal-header-title">
+            <h2>{car ? `Редагування — ${car.brand} ${car.model}` : "Нове оголошення"}</h2>
+            <span className="save-state">
+              {!car || car.listingStatus === "draft"
+                ? form.listingStatus === "draft"
+                  ? "Чернетка · не опубліковано"
+                  : "Буде опубліковано після збереження"
+                : "Опубліковано · ручне збереження"}
+            </span>
+          </div>
           <button className="modal-close" onClick={handleClose}>✕</button>
         </div>
 
@@ -483,6 +492,9 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
                     }));
                   }}
                 >
+                  {(!car || car.listingStatus === "draft") && (
+                    <option value="draft">Чернетка (не опубліковано)</option>
+                  )}
                   <option value="upcoming">Очікується (в дорозі)</option>
                   <option value="available">У наявності</option>
                   <option value="sold">Продано</option>
@@ -847,7 +859,13 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
           <div className="modal-footer">
             <button type="button" className="filter-reset" onClick={handleClose}>Скасувати</button>
             <button type="submit" className="btn-search" disabled={submitting}>
-              {submitting ? "Збереження…" : car ? "Зберегти" : "Додати оголошення"}
+              {submitting
+                ? "Збереження…"
+                : (!car || car.listingStatus === "draft") && form.listingStatus === "draft"
+                  ? "Зберегти чернетку"
+                  : !car || car.listingStatus === "draft"
+                    ? "Опублікувати"
+                    : "Зберегти"}
             </button>
           </div>
 

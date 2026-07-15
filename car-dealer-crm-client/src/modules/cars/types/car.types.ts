@@ -28,7 +28,7 @@ export interface Car {
   shortDescription: string | null;
   description: string | null;
   // Lifecycle / upcoming
-  listingStatus: "upcoming" | "available" | "sold" | "archived";
+  listingStatus: "draft" | "upcoming" | "available" | "sold" | "archived";
   eta: string | null;
   transitStage: "ordered" | "in_transit" | "at_port" | "customs" | "ready" | null;
   estimatedPrice: number | null;

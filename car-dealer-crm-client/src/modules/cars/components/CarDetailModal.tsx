@@ -59,12 +59,12 @@ export function CarDetailModal({ car, onClose, onEdit, onUpdated }: Props) {
   const [tgError, setTgError] = useState<string | null>(null);
   const [riaBusy, setRiaBusy] = useState<"publish" | "delete" | null>(null);
   const [riaError, setRiaError] = useState<string | null>(null);
-  const isArchived = car.listingStatus === "archived";
   const isSold = car.listingStatus === "sold";
-  const riaDisabled = isArchived || isSold;
+  const cannotPublish = car.listingStatus === "draft" || car.listingStatus === "archived";
+  const riaDisabled = cannotPublish || isSold;
 
   async function handlePublish() {
-    if (isArchived) return;
+    if (cannotPublish) return;
     if (car.telegramMessageId) {
       const ok = window.confirm("Перепублікувати пост у Telegram?\nСтарий пост буде видалено, новий — створено.");
       if (!ok) return;
@@ -137,8 +137,10 @@ export function CarDetailModal({ car, onClose, onEdit, onUpdated }: Props) {
             <span className="car-brand">{car.brand}</span>
             <span className="car-model">{car.model}</span>
             <span className="car-row-id">#{car.id}</span>
-            <span className={`badge ${car.isAvailable ? "badge-available" : "badge-unavailable"}`}>
-              {car.listingStatus === "upcoming"
+            <span className={`badge ${car.listingStatus === "draft" ? "badge-draft" : car.isAvailable ? "badge-available" : "badge-unavailable"}`}>
+              {car.listingStatus === "draft"
+                ? "Чернетка"
+                : car.listingStatus === "upcoming"
                 ? "Очікується"
                 : car.listingStatus === "archived"
                   ? "Архів"
@@ -392,8 +394,8 @@ export function CarDetailModal({ car, onClose, onEdit, onUpdated }: Props) {
             <button
               className="filter-reset"
               onClick={handlePublish}
-              disabled={tgBusy !== null || isArchived}
-              title={isArchived ? "Архівні авто не публікуються в Telegram" : ""}
+              disabled={tgBusy !== null || cannotPublish}
+              title={cannotPublish ? "Спочатку опублікуйте авто, змінивши статус" : ""}
             >
               {tgBusy === "publish"
                 ? "..."

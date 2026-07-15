@@ -69,6 +69,11 @@ function a(fn: (req: Request, res: Response) => Promise<void>) {
           return;
         }
       }
+      const status = (err as { status?: number }).status;
+      if (status && status >= 400 && status < 500) {
+        res.status(status).json({ message: err instanceof Error ? err.message : "Request failed" });
+        return;
+      }
       next(err);
     });
 }

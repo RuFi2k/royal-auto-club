@@ -104,8 +104,8 @@ publicRouter.get("/cars", a(async (req, res) => {
     const days = q.soldWithinDays ? Math.max(1, parseInt(str(q.soldWithinDays)!, 10)) : undefined;
     where.soldAt = days ? { gte: new Date(Date.now() - days * 86_400_000) } : { not: null };
   }
-  // status=all → no listingStatus constraint, but still hide archived rows.
-  if (status === "all") where.listingStatus = { not: "archived" };
+  // status=all still excludes CRM-only and archived rows.
+  if (status === "all") where.listingStatus = { notIn: ["draft", "archived"] };
 
   const b = str(q.brand);
   if (b) where.brand = { contains: b, mode: "insensitive" };
@@ -216,7 +216,7 @@ publicRouter.get("/cars", a(async (req, res) => {
 }));
 
 // GET /public/cars/:id — returns the car regardless of status (sold cars
-// keep working URLs for shareable links and SEO). Archived cars are hidden.
+// keep working URLs for shareable links and SEO). Draft and archived cars are hidden.
 publicRouter.get("/cars/:id", a(async (req, res) => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) { res.status(400).json({ message: "Invalid id" }); return; }
@@ -224,7 +224,10 @@ publicRouter.get("/cars/:id", a(async (req, res) => {
     where: { id },
     include: { photos: true, options: true },
   });
-  if (!car || car.listingStatus === "archived") { res.status(404).json({ message: "Car not found" }); return; }
+  if (!car || car.listingStatus === "draft" || car.listingStatus === "archived") {
+    res.status(404).json({ message: "Car not found" });
+    return;
+  }
   res.json(toPublicCar(car as CarWithPhotos));
 }));
 

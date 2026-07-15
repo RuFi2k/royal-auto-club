@@ -64,6 +64,7 @@ const CAR_LOCATION: Record<string, string> = {
 };
 
 const LISTING_STATUS: Record<Car["listingStatus"], { label: string; cls: string }> = {
+  draft: { label: "Чернетка", cls: "badge-draft" },
   available: { label: "Наявний", cls: "badge-available" },
   upcoming: { label: "Очікується", cls: "badge-upcoming" },
   sold: { label: "Продано", cls: "badge-unavailable" },
