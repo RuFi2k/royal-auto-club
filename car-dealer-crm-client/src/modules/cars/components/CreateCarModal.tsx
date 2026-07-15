@@ -76,12 +76,16 @@ interface NumericInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
   allowEmpty?: boolean;
 }
 
+function numericDisplayValue(value: number | null) {
+  return value == null || value === 0 ? "" : String(value);
+}
+
 function NumericInput({ value, onValueChange, decimal = false, allowEmpty = false, min, max, ...props }: NumericInputProps) {
-  const [text, setText] = useState(value == null ? "" : String(value));
+  const [text, setText] = useState(numericDisplayValue(value));
   const focused = useRef(false);
 
   useEffect(() => {
-    if (!focused.current) setText(value == null ? "" : String(value));
+    if (!focused.current) setText(numericDisplayValue(value));
   }, [value]);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -498,8 +502,8 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
             <h3>Управління</h3>
             <div className="form-grid">
               <div className="form-field">
-                <label>Відповідальна особа *</label>
-                <input required value={form.responsiblePerson} onChange={(e) => set("responsiblePerson", e.target.value)} placeholder="Email або ім'я" />
+                <label>Відповідальна особа</label>
+                <input value={form.responsiblePerson} onChange={(e) => set("responsiblePerson", e.target.value)} placeholder="Email або ім'я" />
               </div>
             </div>
           </section>
