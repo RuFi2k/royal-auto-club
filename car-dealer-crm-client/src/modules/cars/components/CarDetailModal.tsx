@@ -36,7 +36,7 @@ const BODY_TYPE: Record<string, string> = {
   van: "Фургон", convertible: "Кабріолет", liftback: "Ліфтбек",
 };
 const CAR_ORIGIN: Record<string, string> = {
-  EU: "ЄС", US: "США", korea: "Корея", japan: "Японія", china: "Китай", other: "Інше",
+  EU: "ЄС", US: "США", canada: "Канада", korea: "Корея", japan: "Японія", china: "Китай", other: "Інше",
 };
 const CAR_LOCATION: Record<string, string> = {
   dealership: "Площадка", owner: "Власник",

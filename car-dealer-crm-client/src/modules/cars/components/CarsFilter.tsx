@@ -137,6 +137,7 @@ export function CarsFilter({ filters, onChange }: Props) {
           <option value="">Усі</option>
           <option value="EU">ЄС</option>
           <option value="US">США</option>
+          <option value="canada">Канада</option>
           <option value="korea">Корея</option>
           <option value="japan">Японія</option>
           <option value="china">Китай</option>

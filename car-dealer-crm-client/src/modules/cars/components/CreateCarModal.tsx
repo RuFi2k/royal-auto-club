@@ -444,6 +444,7 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
                 <select value={form.carOrigin} onChange={(e) => set("carOrigin", e.target.value)}>
                   <option value="EU">ЄС</option>
                   <option value="US">США</option>
+                  <option value="canada">Канада</option>
                   <option value="korea">Корея</option>
                   <option value="japan">Японія</option>
                   <option value="china">Китай</option>

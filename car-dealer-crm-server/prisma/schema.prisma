@@ -57,6 +57,7 @@ enum SellType {
 enum CarOrigin {
   EU
   US
+  canada
   korea
   japan
   china

@@ -11,7 +11,7 @@ import type { DashboardStats } from "../types/stats.types";
 import "../dashboard.css";
 
 const ORIGIN_LABELS: Record<string, string> = {
-  EU: "Європа", US: "США", japan: "Японія",
+  EU: "Європа", US: "США", canada: "Канада", japan: "Японія",
   korea: "Корея", china: "Китай", other: "Інше",
 };
 
