@@ -69,6 +69,57 @@ interface Props {
   onSaved: (savedCar: Car) => void;
 }
 
+interface NumericInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange"> {
+  value: number | null;
+  onValueChange: (value: number | null) => void;
+  decimal?: boolean;
+  allowEmpty?: boolean;
+}
+
+function NumericInput({ value, onValueChange, decimal = false, allowEmpty = false, min, max, ...props }: NumericInputProps) {
+  const [text, setText] = useState(value == null ? "" : String(value));
+  const focused = useRef(false);
+
+  useEffect(() => {
+    if (!focused.current) setText(value == null ? "" : String(value));
+  }, [value]);
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const next = e.target.value;
+    const valid = decimal ? /^\d*(?:[.,]\d*)?$/.test(next) : /^\d*$/.test(next);
+    if (!valid) return;
+    setText(next);
+    if (next === "") {
+      onValueChange(allowEmpty ? null : 0);
+      return;
+    }
+    const parsed = Number(next.replace(",", "."));
+    if (Number.isFinite(parsed)) onValueChange(parsed);
+  }
+
+  function handleBlur() {
+    focused.current = false;
+    if (text === "") return;
+    let parsed = Number(text.replace(",", "."));
+    if (min !== undefined) parsed = Math.max(parsed, Number(min));
+    if (max !== undefined) parsed = Math.min(parsed, Number(max));
+    onValueChange(parsed);
+    setText(String(parsed));
+  }
+
+  return (
+    <input
+      {...props}
+      type="text"
+      inputMode={decimal ? "decimal" : "numeric"}
+      value={text}
+      onFocus={() => { focused.current = true; }}
+      onChange={handleChange}
+      onBlur={handleBlur}
+    />
+  );
+}
+
 function carToForm(car: Car): FormData {
   return {
     brand: car.brand, model: car.model, color: car.color,
@@ -155,17 +206,6 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
 
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
-  }
-
-  function numProps(key: keyof FormData, extra?: React.InputHTMLAttributes<HTMLInputElement>) {
-    const value = form[key] as number;
-    return {
-      ...extra,
-      type: "number" as const,
-      value,
-      onFocus: (e: React.FocusEvent<HTMLInputElement>) => e.target.select(),
-      onChange: (e: React.ChangeEvent<HTMLInputElement>) => set(key, +e.target.value as FormData[typeof key]),
-    };
   }
 
   function handleClose() {
@@ -296,11 +336,11 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
               </div>
               <div className="form-field">
                 <label>Рік *</label>
-                <input required {...numProps("year")} />
+                <NumericInput required value={form.year} onValueChange={(value) => set("year", value ?? 0)} />
               </div>
               <div className="form-field">
                 <label>Пробіг (тис. км) *</label>
-                <input required {...numProps("mileage", { min: 0 })} />
+                <NumericInput required min={0} value={form.mileage} onValueChange={(value) => set("mileage", value ?? 0)} />
               </div>
               <div className="form-field">
                 <label>Колір *</label>
@@ -338,11 +378,11 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
               </div>
               <div className="form-field">
                 <label>Об'єм двигуна (л)</label>
-                <input {...numProps("engineVolume", { step: 0.1, min: 0 })} />
+                <NumericInput decimal min={0} value={form.engineVolume} onValueChange={(value) => set("engineVolume", value ?? 0)} />
               </div>
               <div className="form-field">
                 <label>Потужність (к.с.)</label>
-                <input {...numProps("enginePower", { min: 0 })} />
+                <NumericInput min={0} value={form.enginePower} onValueChange={(value) => set("enginePower", value ?? 0)} />
               </div>
               <div className="form-field">
                 <label>КПП</label>
@@ -387,11 +427,11 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
               </div>
               <div className="form-field">
                 <label>Дверей</label>
-                <input {...numProps("doorsCount", { min: 1, max: 6 })} />
+                <NumericInput min={1} max={6} value={form.doorsCount} onValueChange={(value) => set("doorsCount", value ?? 1)} />
               </div>
               <div className="form-field">
                 <label>Місць</label>
-                <input {...numProps("seatsCount", { min: 1, max: 12 })} />
+                <NumericInput min={1} max={12} value={form.seatsCount} onValueChange={(value) => set("seatsCount", value ?? 1)} />
               </div>
             </div>
           </section>
@@ -438,11 +478,11 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
               </div>
               <div className="form-field">
                 <label>Ціна власника ($)</label>
-                <input {...numProps("ownerPrice", { min: 0 })} />
+                <NumericInput min={0} value={form.ownerPrice} onValueChange={(value) => set("ownerPrice", value ?? 0)} />
               </div>
               <div className="form-field">
                 <label>Ціна для дилерів ($)</label>
-                <input {...numProps("dealerPrice", { min: 0 })} />
+                <NumericInput min={0} value={form.dealerPrice} onValueChange={(value) => set("dealerPrice", value ?? 0)} />
               </div>
               <div className="form-field form-field-checkbox">
                 <label>
@@ -542,11 +582,11 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
                   </div>
                   <div className="form-field">
                     <label>Орієнтовна ціна ($)</label>
-                    <input
-                      type="number"
+                    <NumericInput
+                      allowEmpty
                       placeholder="напр. 71500"
-                      value={form.estimatedPrice ?? ""}
-                      onChange={(e) => set("estimatedPrice", e.target.value === "" ? null : Number(e.target.value))}
+                      value={form.estimatedPrice}
+                      onValueChange={(value) => set("estimatedPrice", value)}
                     />
                   </div>
                 </>
