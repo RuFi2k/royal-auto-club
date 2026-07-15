@@ -83,7 +83,7 @@ const ENGINE_TYPES = new Set([
 ]);
 const GEARBOX_TYPES = new Set(["manual", "automatic", "cvt", "robot", "dual_clutch"]);
 const DRIVETRAINS = new Set(["fwd", "rwd", "awd", "four_wd"]);
-const CAR_ORIGINS = new Set(["EU", "US", "korea", "japan", "china", "other"]);
+const CAR_ORIGINS = new Set(["EU", "US", "canada", "korea", "japan", "china", "other"]);
 const CAR_LOCATIONS = new Set(["owner", "dealership"]);
 const SELL_TYPES = new Set(["retail", "wholesale", "auction", "consignment"]);
 function pickEnum<T extends string>(v: unknown, allowed: Set<string>): T | undefined {
