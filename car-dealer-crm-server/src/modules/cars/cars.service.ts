@@ -9,6 +9,7 @@ export type CarCreateInput = Omit<Prisma.CarUncheckedCreateInput, "vinNumberHash
 export type CarUpdateInput = Omit<Prisma.CarUncheckedUpdateInput, "vinNumberHash">;
 
 export interface CarFilters {
+  listingStatus?: string;
   id?: number;
   brand?: string;
   model?: string;
@@ -164,6 +165,7 @@ export const CarsService = {
     const { page = 1, pageSize = 10, ...rest } = filters;
     const where: Prisma.CarWhereInput = {};
 
+    if (rest.listingStatus) where.listingStatus = rest.listingStatus as Prisma.EnumListingStatusFilter;
     if (rest.id) where.id = rest.id;
     if (rest.brand) where.brand = { contains: rest.brand, mode: "insensitive" };
     if (rest.model) where.model = { contains: rest.model, mode: "insensitive" };

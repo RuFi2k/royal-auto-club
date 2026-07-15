@@ -119,6 +119,7 @@ carsRouter.get("/audit-logs", a(async (req, res) => {
 carsRouter.get("/", a(async (req, res) => {
   const q = req.query;
   const result = await CarsService.getAll({
+    listingStatus: str(q.listingStatus),
     id: q.id ? parseInt(str(q.id)!, 10) : undefined,
     brand: str(q.brand),
     model: str(q.model),
