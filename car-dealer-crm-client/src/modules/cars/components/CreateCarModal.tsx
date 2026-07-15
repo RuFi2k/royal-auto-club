@@ -119,7 +119,9 @@ function getChangedFields(current: FormData, initial: FormData): Partial<FormDat
 
 export function CreateCarModal({ car, onClose, onSaved }: Props) {
   const isCreate = !car;
+  const canSaveDraft = !car || car.listingStatus === "draft";
   const initialForm = useRef<FormData>(car ? carToForm(car) : DEFAULTS);
+  const submitMode = useRef<"draft" | "publish" | "save">(canSaveDraft ? "publish" : "save");
 
   function loadInitial(): FormData {
     if (isCreate) {
@@ -182,15 +184,25 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
       if (techPassportFile) fileUploads.techPassportUrl = await uploadCarFile(techPassportFile, "tech-passports");
       if (defectsCheckFile) fileUploads.defectsCheckUrl = await uploadCarFile(defectsCheckFile, "defects-checks");
 
-      const formWithFiles = { ...form, ...fileUploads };
+      const targetStatus = submitMode.current === "draft"
+        ? "draft"
+        : submitMode.current === "publish" && form.listingStatus === "draft"
+          ? "available"
+          : form.listingStatus;
+      const formWithFiles: FormData = {
+        ...form,
+        ...fileUploads,
+        listingStatus: targetStatus,
+        isAvailable: targetStatus === "available",
+      };
 
       let saved: Car;
       if (car) {
         const changes = getChangedFields(formWithFiles, initialForm.current);
         // Options are compared by set (order-independent), not the generic diff.
         delete changes.options;
-        if (optionsChanged(form.options, initialForm.current.options)) {
-          changes.options = form.options ?? [];
+        if (optionsChanged(formWithFiles.options, initialForm.current.options)) {
+          changes.options = formWithFiles.options ?? [];
         }
         if (Object.keys(changes).length === 0) {
           onSaved(car);
@@ -858,14 +870,25 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
 
           <div className="modal-footer">
             <button type="button" className="filter-reset" onClick={handleClose}>Скасувати</button>
-            <button type="submit" className="btn-search" disabled={submitting}>
-              {submitting
+            {canSaveDraft && (
+              <button
+                type="submit"
+                className="filter-reset"
+                disabled={submitting}
+                onClick={() => { submitMode.current = "draft"; }}
+              >
+                {submitting && submitMode.current === "draft" ? "Збереження…" : "Зберегти чернетку"}
+              </button>
+            )}
+            <button
+              type="submit"
+              className="btn-search"
+              disabled={submitting}
+              onClick={() => { submitMode.current = canSaveDraft ? "publish" : "save"; }}
+            >
+              {submitting && submitMode.current !== "draft"
                 ? "Збереження…"
-                : (!car || car.listingStatus === "draft") && form.listingStatus === "draft"
-                  ? "Зберегти чернетку"
-                  : !car || car.listingStatus === "draft"
-                    ? "Опублікувати"
-                    : "Зберегти"}
+                : canSaveDraft ? "Опублікувати" : "Зберегти"}
             </button>
           </div>
 
