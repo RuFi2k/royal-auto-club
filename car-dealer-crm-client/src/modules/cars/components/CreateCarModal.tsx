@@ -534,9 +534,9 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
             <h3>Статус оголошення</h3>
             <div className="form-grid">
               <div className="form-field">
-                <label>Статус *</label>
+                <label>{canSaveDraft ? "Статус після публікації *" : "Статус *"}</label>
                 <select
-                  value={form.listingStatus}
+                  value={form.listingStatus === "draft" ? "available" : form.listingStatus}
                   onChange={(e) => {
                     const next = e.target.value as FormData["listingStatus"];
                     setForm((prev) => ({
@@ -549,9 +549,6 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
                     }));
                   }}
                 >
-                  {(!car || car.listingStatus === "draft") && (
-                    <option value="draft">Чернетка (не опубліковано)</option>
-                  )}
                   <option value="upcoming">Очікується (в дорозі)</option>
                   <option value="available">У наявності</option>
                   <option value="sold">Продано</option>
