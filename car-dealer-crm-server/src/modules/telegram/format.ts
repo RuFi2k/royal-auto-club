@@ -59,7 +59,7 @@ function formatMileage(km: number): string {
   return `${km.toLocaleString("uk-UA")} км`;
 }
 
-function formatPrice(price: unknown): string {
+export function formatPrice(price: unknown): string {
   const n = Number(price);
   if (!Number.isFinite(n) || n <= 0) return "Ціна за запитом";
   return `$${Math.round(n).toLocaleString("uk-UA").replace(/,/g, " ")}`;
@@ -163,6 +163,16 @@ export function buildCarCaption(
   const finalText = fixed.replace("__DESC__", desc);
   // Trim leading blank lines if status header was empty (archived path) or desc is empty.
   return finalText.replace(/\n{3,}/g, "\n\n").replace(/^\n+/, "");
+}
+
+// Announcements are sent as a reply to the car's original channel post, so
+// subscribers actually get a notification (editing a message is silent).
+export function buildPriceDropText(oldPrice: unknown, newPrice: unknown): string {
+  return `\uD83D\uDD25 <b>\u0426\u0456\u043D\u0443 \u0437\u043D\u0438\u0436\u0435\u043D\u043E!!!</b>\n\n\uD83D\uDCB0 <s>${formatPrice(oldPrice)}</s> \u2192 <b>${formatPrice(newPrice)}</b>`;
+}
+
+export function buildSoldText(): string {
+  return `\uD83D\uDD34 <b>\u041F\u0440\u043E\u0434\u0430\u043D\u043E!!!</b>`;
 }
 
 export function pickPhotoUrls(photos: CarPhoto[], coverFallback: string | null): string[] {

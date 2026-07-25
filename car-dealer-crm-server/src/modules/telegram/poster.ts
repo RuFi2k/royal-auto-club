@@ -1,5 +1,5 @@
 import { prisma } from "../../db";
-import { buildCarCaption, pickPhotoUrls } from "./format";
+import { buildCarCaption, buildPriceDropText, buildSoldText, pickPhotoUrls } from "./format";
 
 const API = "https://api.telegram.org";
 
@@ -28,8 +28,15 @@ type TgMessage = { message_id: number };
 // Skips archived cars (no post). Creates a post the first time, edits caption
 // after that. Photos in the original media group cannot be added/removed once
 // posted — we only edit caption (covers price, status, spec, description).
-export function syncCarTelegramPost(carId: number): void {
-  void runSync(carId).catch((err) => {
+// An event worth notifying subscribers about. The caption is always edited in
+// place; on top of that we post a reply to the original message, which does
+// ping the channel (edits don't).
+export type TelegramAnnounce =
+  | { kind: "price_drop"; oldPrice: unknown; newPrice: unknown }
+  | { kind: "sold" };
+
+export function syncCarTelegramPost(carId: number, announce?: TelegramAnnounce): void {
+  void runSync(carId, announce).catch((err) => {
     console.error(`[telegram] sync failed for car ${carId}:`, err);
   });
 }
@@ -84,7 +91,7 @@ async function deleteMessage(token: string, chatId: string, messageId: number): 
   }
 }
 
-async function runSync(carId: number): Promise<void> {
+async function runSync(carId: number, announce?: TelegramAnnounce): Promise<void> {
   const cfg = config();
   if (!cfg) return; // disabled silently when env not set
 
@@ -102,6 +109,9 @@ async function runSync(carId: number): Promise<void> {
 
   if (car.telegramMessageId) {
     await editExistingPost(cfg.token, cfg.chatId, car.telegramMessageId, caption);
+    if (announce) {
+      await sendAnnouncement(cfg.token, cfg.chatId, car.telegramMessageId, announce);
+    }
     return;
   }
 
@@ -109,6 +119,30 @@ async function runSync(carId: number): Promise<void> {
   const messageId = await createPost(cfg.token, cfg.chatId, caption, photoUrls);
   if (messageId !== null) {
     await prisma.car.update({ where: { id: car.id }, data: { telegramMessageId: messageId } });
+  }
+}
+
+async function sendAnnouncement(
+  token: string,
+  chatId: string,
+  replyToMessageId: number,
+  announce: TelegramAnnounce,
+): Promise<void> {
+  const text =
+    announce.kind === "sold"
+      ? buildSoldText()
+      : buildPriceDropText(announce.oldPrice, announce.newPrice);
+
+  const r = await tgCall<TgMessage>(token, "sendMessage", {
+    chat_id: chatId,
+    text,
+    parse_mode: "HTML",
+    reply_to_message_id: replyToMessageId,
+    // If the original post was deleted from the channel, still post the notice.
+    allow_sending_without_reply: true,
+  });
+  if (!r.ok) {
+    console.error(`[telegram] announcement (${announce.kind}) failed: ${r.description}`);
   }
 }
 

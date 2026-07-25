@@ -1,7 +1,7 @@
 import { Car, Prisma } from "@prisma/client";
 import { prisma } from "../../db";
 import { encrypt, decrypt, hmac } from "../../lib/encryption";
-import { syncCarTelegramPost } from "../telegram/poster";
+import { syncCarTelegramPost, type TelegramAnnounce } from "../telegram/poster";
 import { syncCarAutoRiaAd, deleteAutoRiaAdById } from "../autoria/poster";
 import { normalizeSelectedOptions } from "../autoria/options-catalog";
 
@@ -100,6 +100,32 @@ function syncStatusFields(
   }
 
   return result;
+}
+
+// Decide whether a car update deserves a reply/notification in the Telegram
+// channel. "sold" wins over a price drop when both happen at once. dealerPrice
+// is the number shown in the channel caption, so it's the one we compare.
+function telegramAnnounceFor(before: Car, after: Car): TelegramAnnounce | undefined {
+  // Drafts were never posted, and a car leaving draft gets its first post
+  // (created, not edited) — nothing to reply to.
+  if (before.listingStatus === "draft") return undefined;
+
+  if (before.listingStatus !== "sold" && after.listingStatus === "sold") {
+    return { kind: "sold" };
+  }
+
+  const oldPrice = Number(before.dealerPrice);
+  const newPrice = Number(after.dealerPrice);
+  if (
+    Number.isFinite(oldPrice) &&
+    Number.isFinite(newPrice) &&
+    oldPrice > 0 &&
+    newPrice > 0 &&
+    newPrice < oldPrice
+  ) {
+    return { kind: "price_drop", oldPrice, newPrice };
+  }
+  return undefined;
 }
 
 function decryptCar(car: Car): Car {
@@ -279,7 +305,7 @@ export const CarsService = {
       data: { userId, action: "UPDATE", carId: id, changedFields: changedFields as object },
     });
 
-    syncCarTelegramPost(id);
+    syncCarTelegramPost(id, telegramAnnounceFor(before, updated));
     syncCarAutoRiaAd(id);
     return decryptedAfter;
   },
@@ -333,7 +359,7 @@ export const CarsService = {
         changedFields: { isAvailable: { from: before?.isAvailable, to: isAvailable } } as object,
       },
     });
-    syncCarTelegramPost(id);
+    syncCarTelegramPost(id, before ? telegramAnnounceFor(before, updated) : undefined);
     syncCarAutoRiaAd(id);
     return decryptCar(updated);
   },
