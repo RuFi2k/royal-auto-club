@@ -6,7 +6,9 @@ import {
   updateCarPhoto,
   reorderCarPhotos,
   deleteCarPhoto,
-  uploadOptimizedPhotos,
+  uploadPhotos,
+  describeFailures,
+  type UploadProgress,
 } from "../services/photos.api";
 import type { Car, CarPhoto } from "../types/car.types";
 
@@ -22,6 +24,7 @@ export function PhotoGalleryModal({ car, onClose }: Props) {
   const [savingOrder, setSavingOrder] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -36,20 +39,44 @@ export function PhotoGalleryModal({ car, onClose }: Props) {
     setUploading(true);
     setError(null);
     try {
-      const uploaded = await uploadOptimizedPhotos(selectedFiles);
+      const { uploads, failures } = await uploadPhotos(selectedFiles, {
+        onProgress: setUploadProgress,
+      });
+
+      // Attach whatever made it, so a partial failure never loses finished work.
       const added: CarPhoto[] = [];
-      for (const item of uploaded) {
+      for (const item of uploads) {
+        if (!item) continue;
         const photo = await addCarPhoto(car.id, { url: item.url, alt: item.originalName });
         added.push(photo);
       }
       setPhotos((prev) => [...prev, ...added]);
-      setSelectedFiles([]);
+
       if (inputRef.current) inputRef.current.value = "";
+      if (failures.length > 0) {
+        // Keep only the ones that failed selected, ready for another attempt.
+        const failed = new Set(failures.map((f) => f.index));
+        setSelectedFiles(selectedFiles.filter((_, i) => failed.has(i)));
+        setError(
+          describeFailures(failures, selectedFiles.length) +
+            " Решту додано. Натисніть «Додати» ще раз, щоб повторити.",
+        );
+      } else {
+        setSelectedFiles([]);
+      }
     } catch (e: any) {
       setError(e.message);
     } finally {
       setUploading(false);
+      setUploadProgress(null);
     }
+  }
+
+  function selectPhotos(files: FileList | null) {
+    const selected = Array.from(files ?? []);
+    const jpgFiles = selected.filter((file) => file.type === "image/jpeg" || /\.jpe?g$/i.test(file.name));
+    setSelectedFiles(jpgFiles);
+    setError(jpgFiles.length === selected.length ? null : "Підтримуються лише фото JPG.");
   }
 
   async function handleDelete(photo: CarPhoto) {
@@ -117,9 +144,9 @@ export function PhotoGalleryModal({ car, onClose }: Props) {
                 ref={inputRef}
                 type="file"
                 multiple
-                accept="image/*"
+                accept=".jpg,.jpeg,image/jpeg"
                 className="upload-input"
-                onChange={(e) => setSelectedFiles(Array.from(e.target.files ?? []))}
+                onChange={(e) => selectPhotos(e.target.files)}
               />
               <button
                 className="btn-search"
@@ -127,9 +154,33 @@ export function PhotoGalleryModal({ car, onClose }: Props) {
                 onClick={handleUpload}
                 disabled={uploading || !selectedFiles.length}
               >
-                {uploading ? "Завантаження…" : `Додати ${selectedFiles.length || ""}`}
+                {uploading
+                  ? uploadProgress
+                    ? `${uploadProgress.done}/${uploadProgress.total}…`
+                    : "Завантаження…"
+                  : `Додати ${selectedFiles.length || ""}`}
               </button>
             </div>
+            {uploadProgress && uploadProgress.total > 0 && (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
+                  <span>Завантаження фото… {uploadProgress.done} з {uploadProgress.total}</span>
+                  {uploadProgress.failed > 0 && (
+                    <span style={{ color: "#e5484d" }}>помилок: {uploadProgress.failed}</span>
+                  )}
+                </div>
+                <div style={{ height: 6, borderRadius: 3, background: "#2a2a3a", overflow: "hidden" }}>
+                  <div
+                    style={{
+                      height: "100%",
+                      width: `${Math.round((uploadProgress.done / uploadProgress.total) * 100)}%`,
+                      background: "#3b82f6",
+                      transition: "width 160ms linear",
+                    }}
+                  />
+                </div>
+              </div>
+            )}
             {selectedFiles.length > 0 && (
               <div className="archives-selected">
                 {selectedFiles.map((f, i) => (
@@ -138,7 +189,10 @@ export function PhotoGalleryModal({ car, onClose }: Props) {
               </div>
             )}
             <p style={{ fontSize: 12, color: "#888", marginTop: 6 }}>
-              Перше фото — обкладинка. Перетягніть стрілками для зміни порядку.
+              Підтримуються лише фото JPG. HEIC можна{" "}
+              <a href="https://www.iloveimg.com/ru/convert-to-jpg/heic-to-jpg" target="_blank" rel="noreferrer">
+                конвертувати в JPG
+              </a>. Перше фото — обкладинка.
             </p>
           </div>
 

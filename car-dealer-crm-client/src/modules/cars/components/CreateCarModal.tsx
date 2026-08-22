@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { createCar, updateCar } from "../services/cars.api";
 import { uploadCarFile } from "../services/storage";
-import { uploadOptimizedPhotos } from "../services/photos.api";
+import {
+  uploadPhotos,
+  describeFailures,
+  type OptimizedUpload,
+  type UploadProgress,
+} from "../services/photos.api";
 import type { Car, SelectedOption } from "../types/car.types";
 import { CRASH_BODY_PARTS, CRASH_BODY_PART_LABELS } from "../lib/crash-body-parts";
 import { PhotoGalleryModal } from "./PhotoGalleryModal";
@@ -194,6 +199,10 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
   const [stagedPhotos, setStagedPhotos] = useState<StagedPhoto[]>([]);
   const [showGalleryModal, setShowGalleryModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
+  // Photos that already reached the server, keyed by staged-photo key. A retry
+  // after a partial failure re-sends only what actually failed.
+  const uploadedByKey = useRef<Map<string, OptimizedUpload>>(new Map());
   const [error, setError] = useState<string | null>(null);
 
   // Revoke object URLs when staged photos are removed/unmounted
@@ -221,6 +230,7 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
     setSubmitting(true);
     setError(null);
     try {
@@ -255,9 +265,24 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
         saved = await updateCar(car.id, changes);
       } else {
         // CREATE mode — upload staged gallery photos via the optimizing endpoint, then POST with photos[]
-        const uploaded = await uploadOptimizedPhotos(stagedPhotos.map((p) => p.file));
-        const uploadedPhotos = uploaded.map((item, i) => ({
-          url: item.url,
+        const { uploads, failures } = await uploadPhotos(
+          stagedPhotos.map((p) => p.file),
+          {
+            onProgress: setUploadProgress,
+            alreadyUploaded: (i) => uploadedByKey.current.get(stagedPhotos[i].key) ?? null,
+          },
+        );
+        uploads.forEach((item, i) => {
+          if (item) uploadedByKey.current.set(stagedPhotos[i].key, item);
+        });
+        if (failures.length > 0) {
+          throw new Error(
+            describeFailures(failures, stagedPhotos.length) +
+              " Натисніть кнопку ще раз — уже завантажені фото не надсилатимуться повторно.",
+          );
+        }
+        const uploadedPhotos = uploads.map((item, i) => ({
+          url: item!.url,
           alt: stagedPhotos[i]?.alt || null,
         }));
         const payload: any = { ...formWithFiles };
@@ -270,13 +295,17 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
       setError(err.message);
     } finally {
       setSubmitting(false);
+      setUploadProgress(null);
     }
   }
 
   function addStagedPhotos(files: FileList | File[]) {
     const arr = Array.from(files);
     if (arr.length === 0) return;
-    const additions: StagedPhoto[] = arr.map((file) => ({
+    const jpgFiles = arr.filter((file) => file.type === "image/jpeg" || /\.jpe?g$/i.test(file.name));
+    if (jpgFiles.length !== arr.length) setError("Підтримуються лише фото JPG.");
+    if (jpgFiles.length === 0) return;
+    const additions: StagedPhoto[] = jpgFiles.map((file) => ({
       key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       file,
       previewUrl: URL.createObjectURL(file),
@@ -286,6 +315,7 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
   }
 
   function removeStagedPhoto(key: string) {
+    uploadedByKey.current.delete(key);
     setStagedPhotos((prev) => {
       const target = prev.find((p) => p.key === key);
       if (target) URL.revokeObjectURL(target.previewUrl);
@@ -732,7 +762,7 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
                   <label>Фото автомобіля (перше — обкладинка)</label>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept=".jpg,.jpeg,image/jpeg"
                     multiple
                     className="upload-input"
                     onChange={(e) => {
@@ -740,6 +770,12 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
                       e.target.value = "";
                     }}
                   />
+                  <span style={{ fontSize: 12, color: "#888", marginTop: 6 }}>
+                    Підтримуються лише фото JPG. HEIC можна{" "}
+                    <a href="https://www.iloveimg.com/ru/convert-to-jpg/heic-to-jpg" target="_blank" rel="noreferrer">
+                      конвертувати в JPG
+                    </a>.
+                  </span>
                 </div>
                 {stagedPhotos.length > 0 && (
                   <div
@@ -908,6 +944,35 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
             </div>
           </section>
 
+          {uploadProgress && uploadProgress.total > 0 && (
+            <div
+              style={{
+                margin: "0 0 12px",
+                padding: "10px 12px",
+                border: "1px solid #2a2a3a",
+                borderRadius: 10,
+                background: "#15151f",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 8 }}>
+                <span>Завантаження фото… {uploadProgress.done} з {uploadProgress.total}</span>
+                {uploadProgress.failed > 0 && (
+                  <span style={{ color: "#e5484d" }}>помилок: {uploadProgress.failed}</span>
+                )}
+              </div>
+              <div style={{ height: 6, borderRadius: 3, background: "#2a2a3a", overflow: "hidden" }}>
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${Math.round((uploadProgress.done / uploadProgress.total) * 100)}%`,
+                    background: "#3b82f6",
+                    transition: "width 160ms linear",
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           {error && <div className="cars-error" style={{ margin: "0 0 12px" }}>{error}</div>}
 
           <div className="modal-footer">
@@ -919,7 +984,11 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
                 disabled={submitting}
                 onClick={() => { submitMode.current = "draft"; }}
               >
-                {submitting && submitMode.current === "draft" ? "Збереження…" : "Зберегти чернетку"}
+                {submitting && submitMode.current === "draft"
+                  ? uploadProgress
+                    ? `Фото ${uploadProgress.done}/${uploadProgress.total}…`
+                    : "Збереження…"
+                  : "Зберегти чернетку"}
               </button>
             )}
             <button
@@ -929,7 +998,9 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
               onClick={() => { submitMode.current = canSaveDraft ? "publish" : "save"; }}
             >
               {submitting && submitMode.current !== "draft"
-                ? "Збереження…"
+                ? uploadProgress
+                  ? `Фото ${uploadProgress.done}/${uploadProgress.total}…`
+                  : "Збереження…"
                 : canSaveDraft ? "Опублікувати" : "Зберегти"}
             </button>
           </div>

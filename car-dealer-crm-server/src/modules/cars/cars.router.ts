@@ -18,17 +18,17 @@ carsRouter.use(requireAuth);
 
 const photoUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024, files: 30 },
+  limits: { fileSize: 25 * 1024 * 1024, files: 50 },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith("image/")) cb(null, true);
-    else cb(new Error("Only image files are allowed"));
+    if (file.mimetype === "image/jpeg") cb(null, true);
+    else cb(new Error("Only JPG photos are supported"));
   },
 });
 
 // Wraps multer middleware so its errors (file too large, non-image, etc.) become 400
 // instead of falling through to the global 500 handler.
 function uploadMiddleware(req: Request, res: Response, next: NextFunction) {
-  photoUpload.array("files", 30)(req, res, (err) => {
+  photoUpload.array("files", 50)(req, res, (err) => {
     if (err) { res.status(400).json({ message: err.message ?? "Upload failed" }); return; }
     next();
   });
