@@ -15,6 +15,11 @@ import { suggestCarOptions, isSuggestConfigured } from "../autoria/suggest";
 
 export const carsRouter = Router();
 
+// A listing may not go public with fewer than this many photos. Drafts are
+// exempt so half-finished work can still be saved. Mirrored in the CRM client;
+// enforced here so the rule holds for direct API calls too.
+const MIN_PUBLISHED_PHOTOS = 8;
+
 carsRouter.use(requireAuth);
 
 const photoUpload = multer({
@@ -214,6 +219,14 @@ carsRouter.post("/", a(async (req, res) => {
     photos?: Array<{ url: string; alt?: string | null }>;
     options?: Array<{ optionId: number; valueId?: number | null }>;
   };
+
+  const photoCount = Array.isArray(photos) ? photos.length : 0;
+  if (carInput.listingStatus !== "draft" && photoCount < MIN_PUBLISHED_PHOTOS) {
+    res.status(400).json({
+      message: `Для публікації потрібно щонайменше ${MIN_PUBLISHED_PHOTOS} фото (додано ${photoCount}).`,
+    });
+    return;
+  }
 
   // Denormalize cover from gallery if explicit photoUrl wasn't provided.
   if (Array.isArray(photos) && photos.length > 0 && !carInput.photoUrl) {

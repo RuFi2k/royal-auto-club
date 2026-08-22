@@ -4,6 +4,7 @@ import { uploadCarFile } from "../services/storage";
 import {
   uploadPhotos,
   describeFailures,
+  getCarPhotos,
   type OptimizedUpload,
   type UploadProgress,
 } from "../services/photos.api";
@@ -177,6 +178,10 @@ function getChangedFields(current: FormData, initial: FormData): Partial<FormDat
   }, {} as Partial<FormData>);
 }
 
+// A listing may not go public with fewer than this many photos. Draft saves are
+// exempt so half-finished work can still be stored.
+const MIN_PHOTOS = 8;
+
 export function CreateCarModal({ car, onClose, onSaved }: Props) {
   const isCreate = !car;
   const canSaveDraft = !car || car.listingStatus === "draft";
@@ -203,6 +208,9 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
   // Photos that already reached the server, keyed by staged-photo key. A retry
   // after a partial failure re-sends only what actually failed.
   const uploadedByKey = useRef<Map<string, OptimizedUpload>>(new Map());
+  // Photos already attached to an existing car. Counted toward MIN_PHOTOS when
+  // publishing from edit mode, where the gallery lives on the server.
+  const [existingPhotoCount, setExistingPhotoCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   // Revoke object URLs when staged photos are removed/unmounted
@@ -228,8 +236,29 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
     onClose();
   }
 
+  useEffect(() => {
+    if (!car) return;
+    let cancelled = false;
+    getCarPhotos(car.id)
+      .then((photos) => { if (!cancelled) setExistingPhotoCount(photos.length); })
+      .catch(() => { /* count stays 0; the server still enforces the minimum */ });
+    return () => { cancelled = true; };
+  }, [car]);
+
+  // Photos that will be attached once this form is saved.
+  const photoCount = isCreate ? stagedPhotos.length : existingPhotoCount;
+  const photosMissing = Math.max(0, MIN_PHOTOS - photoCount);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    // Drafts may be saved incomplete; anything that goes public may not.
+    if (submitMode.current !== "draft" && photoCount < MIN_PHOTOS) {
+      setError(
+        `Для публікації потрібно щонайменше ${MIN_PHOTOS} фото. Зараз ${photoCount} — додайте ще ${photosMissing}.`,
+      );
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
@@ -776,6 +805,17 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
                       конвертувати в JPG
                     </a>.
                   </span>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      marginTop: 4,
+                      color: photosMissing > 0 ? "#e0a030" : "#3fa46a",
+                    }}
+                  >
+                    {photosMissing > 0
+                      ? `Для публікації потрібно щонайменше ${MIN_PHOTOS} фото — додано ${photoCount}, ще ${photosMissing}.`
+                      : `Фото: ${photoCount} — достатньо для публікації.`}
+                  </span>
                 </div>
                 {stagedPhotos.length > 0 && (
                   <div
@@ -994,7 +1034,12 @@ export function CreateCarModal({ car, onClose, onSaved }: Props) {
             <button
               type="submit"
               className="btn-search"
-              disabled={submitting}
+              disabled={submitting || photosMissing > 0}
+              title={
+                photosMissing > 0
+                  ? `Додайте ще ${photosMissing} фото (мінімум ${MIN_PHOTOS})`
+                  : undefined
+              }
               onClick={() => { submitMode.current = canSaveDraft ? "publish" : "save"; }}
             >
               {submitting && submitMode.current !== "draft"
