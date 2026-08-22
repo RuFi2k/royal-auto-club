@@ -4,6 +4,7 @@ import { Login } from "../../modules/auth/Login";
 import ProtectedRoute from "./ProtectedRoute";
 import { CarsPage } from "../cars/components/CarsPage";
 import { DashboardPage } from "../dashboard/components/DashboardPage";
+import { AuditLogPage } from "../audit/components/AuditLogPage";
 
 export function AppRoutes() {
     return (
@@ -29,6 +30,16 @@ export function AppRoutes() {
             element={
               <ProtectedRoute>
                 <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Admin-only; AuditLogPage redirects managers back to /listings. */}
+          <Route
+            path="/audit"
+            element={
+              <ProtectedRoute>
+                <AuditLogPage />
               </ProtectedRoute>
             }
           />

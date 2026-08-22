@@ -113,6 +113,9 @@ export function CarsPage() {
           {userStatus?.isAdmin && (
             <button className="nav-tab" onClick={() => navigate("/dashboard")}>Дашборд</button>
           )}
+          {userStatus?.isAdmin && (
+            <button className="nav-tab" onClick={() => navigate("/audit")}>Журнал подій</button>
+          )}
         </nav>
         <div className="cars-header-user">
           {userStatus?.isAdmin && (

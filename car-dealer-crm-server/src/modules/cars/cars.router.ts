@@ -3,7 +3,8 @@ import { Prisma } from "@prisma/client";
 import multer from "multer";
 import { CarsService } from "./cars.service";
 import { prisma } from "../../db";
-import { requireAuth, AuthRequest } from "../../middleware/auth.middleware";
+import { requireAuth, requireAdmin, AuthRequest } from "../../middleware/auth.middleware";
+import { recordAudit } from "../../lib/audit";
 import { sanitizeRichText } from "../../lib/sanitize-html";
 import { optimizeAndUpload } from "./photo-upload";
 import { putObject, deleteObjectByUrl } from "../../lib/storage";
@@ -49,6 +50,10 @@ function singleFileMiddleware(req: Request, res: Response, next: NextFunction) {
 
 function uid(req: Request): string {
   return (req as AuthRequest).uid;
+}
+
+function actor(req: Request): { userId: string; userEmail: string } {
+  return { userId: (req as AuthRequest).uid, userEmail: (req as AuthRequest).email };
 }
 
 function str(v: unknown): string | undefined {
@@ -103,16 +108,31 @@ carsRouter.post("/upload-file", singleFileMiddleware, a(async (req, res) => {
   res.json({ url, filename: file.originalname });
 }));
 
-// GET /cars/audit-logs — MUST be before /:id to avoid "audit-logs" matching as an id
-carsRouter.get("/audit-logs", a(async (req, res) => {
-  const { carId, userId, page, pageSize } = req.query;
+// GET /cars/audit-logs — admin only. MUST be before /:id so "audit-logs" is
+// not matched as an id.
+carsRouter.get("/audit-logs", requireAdmin, a(async (req, res) => {
+  const { carId, userId, action, from, to, page, pageSize } = req.query;
+  const date = (v: unknown) => {
+    const raw = str(v);
+    if (!raw) return undefined;
+    const d = new Date(raw);
+    return isNaN(d.getTime()) ? undefined : d;
+  };
   const result = await CarsService.getAuditLogs({
     carId: carId ? parseInt(str(carId)!, 10) : undefined,
     userId: str(userId),
+    action: str(action),
+    from: date(from),
+    to: date(to),
     page: page ? parseInt(str(page)!, 10) : undefined,
     pageSize: pageSize ? parseInt(str(pageSize)!, 10) : undefined,
   });
   res.json(result);
+}));
+
+// GET /cars/audit-actors — admin only; populates the log's user filter.
+carsRouter.get("/audit-actors", requireAdmin, a(async (_req, res) => {
+  res.json(await CarsService.getAuditActors());
 }));
 
 // GET /cars
@@ -269,6 +289,7 @@ carsRouter.post("/:id/telegram/publish", a(async (req, res) => {
   if (isNaN(id)) { res.status(400).json({ message: "Invalid id" }); return; }
   try {
     const result = await republishCarTelegramPost(id);
+    void recordAudit({ ...actor(req), action: "TELEGRAM_PUBLISH", carId: id });
     res.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Telegram publish failed";
@@ -282,6 +303,7 @@ carsRouter.delete("/:id/telegram", a(async (req, res) => {
   if (isNaN(id)) { res.status(400).json({ message: "Invalid id" }); return; }
   try {
     await deleteCarTelegramPost(id);
+    void recordAudit({ ...actor(req), action: "TELEGRAM_DELETE", carId: id });
     res.status(204).send();
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Telegram delete failed";
@@ -295,6 +317,7 @@ carsRouter.post("/:id/autoria/publish", a(async (req, res) => {
   if (isNaN(id)) { res.status(400).json({ message: "Invalid id" }); return; }
   try {
     const result = await publishCarToAutoRia(id);
+    void recordAudit({ ...actor(req), action: "AUTORIA_PUBLISH", carId: id, changedFields: { adId: (result as { adId?: unknown })?.adId ?? null } });
     res.json(result);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "AUTO.RIA publish failed";
@@ -308,6 +331,7 @@ carsRouter.delete("/:id/autoria", a(async (req, res) => {
   if (isNaN(id)) { res.status(400).json({ message: "Invalid id" }); return; }
   try {
     await deleteCarAutoRiaAd(id);
+    void recordAudit({ ...actor(req), action: "AUTORIA_DELETE", carId: id });
     res.status(204).send();
   } catch (err) {
     const msg = err instanceof Error ? err.message : "AUTO.RIA delete failed";
@@ -348,6 +372,7 @@ carsRouter.post("/:id/photos", a(async (req, res) => {
   });
   await syncCoverPhoto(carId);
   syncCarTelegramPost(carId);
+  void recordAudit({ ...actor(req), action: "PHOTO_ADD", carId, changedFields: { photoId: photo.id, url: photo.url } });
   res.status(201).json(photo);
 }));
 
@@ -385,6 +410,7 @@ carsRouter.put("/:id/photos/order", a(async (req, res) => {
   });
   await prisma.car.update({ where: { id: carId }, data: { photoUrl: photos[0]?.url ?? null } });
   syncCarTelegramPost(carId);
+  void recordAudit({ ...actor(req), action: "PHOTO_REORDER", carId, changedFields: { count: ids.length } });
   res.json(photos);
 }));
 
@@ -398,6 +424,7 @@ carsRouter.delete("/:id/photos/:photoId", a(async (req, res) => {
   await deleteObjectByUrl(existing?.url);
   await syncCoverPhoto(carId);
   syncCarTelegramPost(carId);
+  void recordAudit({ ...actor(req), action: "PHOTO_DELETE", carId, changedFields: { photoId, url: existing?.url ?? null } });
   res.status(204).send();
 }));
 

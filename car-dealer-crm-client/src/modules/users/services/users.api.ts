@@ -2,9 +2,12 @@ import { authHeadersNoContentType } from "../../cars/services/api.helpers";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";
 
+export type UserRole = "admin" | "manager";
+
 export interface UserStatus {
   approved: boolean;
   isAdmin: boolean;
+  role: UserRole;
   disabled: boolean;
 }
 
@@ -20,7 +23,11 @@ export interface ApprovedUser {
   email: string;
   name: string | null;
   disabled: boolean;
+  role: UserRole;
   isAdmin: boolean;
+  // true when the account is pinned to admin via the ADMIN_EMAILS env var,
+  // which the UI cannot override.
+  roleLocked: boolean;
   createdAt: string;
 }
 
@@ -78,4 +85,17 @@ export async function enableUser(uid: string): Promise<void> {
     headers: await authHeadersNoContentType(),
   });
   if (!res.ok) throw new Error("Failed to enable user");
+}
+
+export async function setUserRole(uid: string, role: UserRole): Promise<ApprovedUser> {
+  const res = await fetch(`${API_URL}/users/${uid}/role`, {
+    method: "PATCH",
+    headers: { ...(await authHeadersNoContentType()), "Content-Type": "application/json" },
+    body: JSON.stringify({ role }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.message ?? "Не вдалося змінити роль");
+  }
+  return res.json();
 }

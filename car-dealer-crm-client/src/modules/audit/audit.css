@@ -1,0 +1,136 @@
+.audit-page {
+  min-height: 100vh;
+  background: #f7f8fa;
+}
+
+.audit-body {
+  padding: 20px 24px 40px;
+}
+
+.audit-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.audit-filters select,
+.audit-filters input {
+  padding: 7px 10px;
+  font-size: 13px;
+  color: #1a1a2e;
+  background: #fff;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+}
+
+.audit-filters select { min-width: 170px; }
+.audit-filters input[type="number"] { width: 110px; }
+
+.audit-date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #718096;
+}
+
+.audit-table-wrap {
+  overflow-x: auto;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.audit-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.audit-table th {
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #718096;
+  text-align: left;
+  white-space: nowrap;
+  background: #f7f8fa;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.audit-table td {
+  padding: 10px 12px;
+  color: #1a1a2e;
+  vertical-align: top;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.audit-table tr:last-child td { border-bottom: none; }
+.audit-table tbody tr:hover { background: #fafbfc; }
+
+.audit-time,
+.audit-target { white-space: nowrap; color: #4a5568; }
+
+.audit-user {
+  word-break: break-all;
+  color: #2d3748;
+  font-weight: 500;
+}
+
+/* The diff column carries the most text — let it wrap and stay readable. */
+.audit-details {
+  color: #4a5568;
+  line-height: 1.5;
+  min-width: 260px;
+}
+
+.audit-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  border-radius: 12px;
+}
+
+.audit-badge-good    { color: #22683f; background: #d7f5e3; }
+.audit-badge-bad     { color: #9b2c2c; background: #fed7d7; }
+.audit-badge-warn    { color: #975a16; background: #fefcbf; }
+.audit-badge-neutral { color: #4a5568; background: #e2e8f0; }
+
+.audit-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 16px;
+  font-size: 13px;
+  color: #718096;
+}
+
+.audit-pagination button {
+  padding: 6px 14px;
+  font-size: 13px;
+  color: #1a1a2e;
+  cursor: pointer;
+  background: #fff;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+}
+
+.audit-pagination button:disabled {
+  color: #a0aec0;
+  cursor: not-allowed;
+  background: #f7f8fa;
+}
+
+@media (max-width: 720px) {
+  .audit-body { padding: 14px; }
+  .audit-filters select { min-width: 140px; }
+}

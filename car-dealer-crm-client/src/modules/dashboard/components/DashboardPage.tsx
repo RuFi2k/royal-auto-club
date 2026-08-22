@@ -88,6 +88,7 @@ export function DashboardPage() {
         <nav className="header-nav">
           <button className="nav-tab" onClick={() => navigate("/listings")}>Список</button>
           <button className="nav-tab nav-tab-active">Дашборд</button>
+          <button className="nav-tab" onClick={() => navigate("/audit")}>Журнал подій</button>
         </nav>
         <div className="cars-header-user">
           <span>{user?.email}</span>

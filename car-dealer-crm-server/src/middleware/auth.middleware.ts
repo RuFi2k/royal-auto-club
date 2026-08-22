@@ -6,9 +6,16 @@ import { prisma } from "../db";
 export interface AuthRequest extends Request {
   uid: string;
   email: string;
+  isAdmin: boolean;
 }
 
 export { isAdminEmail };
+
+// The `role` column is the source of truth; ADMIN_EMAILS stays as a bootstrap
+// escape hatch so a misconfigured role can never lock every admin out.
+function resolveIsAdmin(user: { role?: unknown }, email: string): boolean {
+  return user.role === "admin" || isAdminEmail(email);
+}
 
 async function resolveSession(req: Request) {
   return auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
@@ -22,8 +29,10 @@ export async function requireFirebaseAuth(req: Request, res: Response, next: Nex
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
+  const email = (session.user.email ?? "").toLowerCase();
   (req as AuthRequest).uid = session.user.id;
-  (req as AuthRequest).email = (session.user.email ?? "").toLowerCase();
+  (req as AuthRequest).email = email;
+  (req as AuthRequest).isAdmin = resolveIsAdmin(session.user, email);
   next();
 }
 
@@ -37,8 +46,9 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
   const email = (session.user.email ?? "").toLowerCase();
   const u = session.user as typeof session.user & { approved?: boolean; disabled?: boolean };
+  const admin = resolveIsAdmin(session.user, email);
 
-  if (!isAdminEmail(email)) {
+  if (!admin) {
     if (u.disabled) {
       res.status(403).json({ message: "account_disabled" });
       return;
@@ -51,6 +61,16 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
   (req as AuthRequest).uid = u.id;
   (req as AuthRequest).email = email;
+  (req as AuthRequest).isAdmin = admin;
+  next();
+}
+
+// Blocks anyone who is not an admin. Used for the event log and user management.
+export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!(req as AuthRequest).isAdmin) {
+    res.status(403).json({ message: "Admin only" });
+    return;
+  }
   next();
 }
 

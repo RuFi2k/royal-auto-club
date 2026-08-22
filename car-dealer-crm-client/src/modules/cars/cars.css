@@ -1385,3 +1385,16 @@ form.modal-body .cars-error,
   border-radius: 10px;
   background: #0e0e16;
 }
+
+/* Role pill in the users panel */
+.role-badge {
+  display: inline-block;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  border-radius: 12px;
+}
+
+.role-badge-admin   { color: #22543d; background: #d7f5e3; }
+.role-badge-manager { color: #4a5568; background: #e2e8f0; }

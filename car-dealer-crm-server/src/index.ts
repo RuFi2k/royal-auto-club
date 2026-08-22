@@ -10,6 +10,8 @@ import { publicRouter } from "./modules/public/public.router";
 import { prisma } from "./db";
 import { runBackup } from "./lib/backup";
 import { auth, isAdminEmail } from "./lib/auth";
+import { recordAudit } from "./lib/audit";
+import { fromNodeHeaders } from "better-auth/node";
 
 const app = express();
 const PORT = process.env.PORT ?? 3000;
@@ -21,6 +23,24 @@ const corsOrigins = (process.env.CORS_ORIGIN ?? "http://localhost:5173")
   .map((s) => s.trim())
   .filter(Boolean);
 app.use(cors({ origin: corsOrigins, credentials: true }));
+
+// Sign-out destroys the session, so the actor has to be resolved *before* the
+// Better Auth handler runs.
+app.use("/api/auth/sign-out", (req, _res, next) => {
+  auth.api
+    .getSession({ headers: fromNodeHeaders(req.headers) })
+    .then((session) => {
+      if (session) {
+        void recordAudit({
+          userId: session.user.id,
+          userEmail: session.user.email ?? null,
+          action: "LOGOUT",
+        });
+      }
+    })
+    .catch(() => { /* never block sign-out on an audit failure */ });
+  next();
+});
 
 // Better Auth handler — MUST be mounted before express.json() so it can read the
 // raw request body for its own routes.
@@ -70,9 +90,26 @@ async function seedAdmin() {
   }
 }
 
+// ADMIN_EMAILS is the bootstrap list: promote any account on it that is not
+// already flagged admin in the DB. Runs every boot so adding an email to the
+// env still works, while day-to-day role changes happen in the Users panel.
+async function syncAdminRoles() {
+  const emails = (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  if (emails.length === 0) return;
+  const { count } = await prisma.user.updateMany({
+    where: { email: { in: emails }, role: { not: "admin" } },
+    data: { role: "admin", approved: true },
+  });
+  if (count > 0) console.log(`[seed] promoted ${count} account(s) to admin from ADMIN_EMAILS`);
+}
+
 async function main() {
   await prisma.$connect();
   await seedAdmin();
+  await syncAdminRoles();
   app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });

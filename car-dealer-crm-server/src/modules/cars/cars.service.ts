@@ -1,6 +1,7 @@
 import { Car, Prisma } from "@prisma/client";
 import { prisma } from "../../db";
 import { encrypt, decrypt, hmac } from "../../lib/encryption";
+import { recordAudit } from "../../lib/audit";
 import { syncCarTelegramPost, type TelegramAnnounce } from "../telegram/poster";
 import { syncCarAutoRiaAd, deleteAutoRiaAdById } from "../autoria/poster";
 import { normalizeSelectedOptions } from "../autoria/options-catalog";
@@ -149,13 +150,11 @@ export const CarsService = {
     const synced = syncStatusFields(data as Record<string, unknown>);
     const encrypted = encryptInput(synced);
     const car = await prisma.car.create({ data: encrypted as Prisma.CarUncheckedCreateInput });
-    await prisma.auditLog.create({
-      data: {
-        userId,
-        action: "CREATE",
-        carId: car.id,
-        changedFields: { brand: car.brand, model: car.model, year: car.year } as object,
-      },
+    await recordAudit({
+      userId,
+      action: "CREATE",
+      carId: car.id,
+      changedFields: { brand: car.brand, model: car.model, year: car.year },
     });
     // Telegram post is synced from the router after photos are attached, so the
     // initial sendMediaGroup carries the gallery instead of being a text post.
@@ -301,9 +300,7 @@ export const CarsService = {
       }
     }
 
-    await prisma.auditLog.create({
-      data: { userId, action: "UPDATE", carId: id, changedFields: changedFields as object },
-    });
+    await recordAudit({ userId, action: "UPDATE", carId: id, changedFields });
 
     syncCarTelegramPost(id, telegramAnnounceFor(before, updated));
     syncCarAutoRiaAd(id);
@@ -313,15 +310,11 @@ export const CarsService = {
   async delete(id: number, userId: string): Promise<void> {
     const car = await prisma.car.findUnique({ where: { id } });
     await prisma.car.delete({ where: { id } });
-    await prisma.auditLog.create({
-      data: {
-        userId,
-        action: "DELETE",
-        carId: id,
-        changedFields: car
-          ? ({ brand: car.brand, model: car.model, year: car.year } as object)
-          : undefined,
-      },
+    await recordAudit({
+      userId,
+      action: "DELETE",
+      carId: id,
+      changedFields: car ? { brand: car.brand, model: car.model, year: car.year } : null,
     });
     // Remove the AUTO.RIA ad too (row is gone; nothing to null out afterwards).
     void deleteAutoRiaAdById(car?.autoriaAdId).catch((err) =>
@@ -351,24 +344,32 @@ export const CarsService = {
         ...(listingStatusUpdate !== undefined ? { listingStatus: listingStatusUpdate } : {}),
       },
     });
-    await prisma.auditLog.create({
-      data: {
-        userId,
-        action: "AVAILABILITY_CHANGE",
-        carId: id,
-        changedFields: { isAvailable: { from: before?.isAvailable, to: isAvailable } } as object,
-      },
+    await recordAudit({
+      userId,
+      action: "AVAILABILITY_CHANGE",
+      carId: id,
+      changedFields: { isAvailable: { from: before?.isAvailable, to: isAvailable } },
     });
     syncCarTelegramPost(id, before ? telegramAnnounceFor(before, updated) : undefined);
     syncCarAutoRiaAd(id);
     return decryptCar(updated);
   },
 
-  async getAuditLogs(filters: { carId?: number; userId?: string; page?: number; pageSize?: number }) {
-    const { page = 1, pageSize = 20, carId, userId } = filters;
+  async getAuditLogs(filters: {
+    carId?: number;
+    userId?: string;
+    action?: string;
+    from?: Date;
+    to?: Date;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const { page = 1, pageSize = 20, carId, userId, action, from, to } = filters;
     const where: Prisma.AuditLogWhereInput = {};
     if (carId) where.carId = carId;
     if (userId) where.userId = userId;
+    if (action) where.action = action as Prisma.EnumAuditActionFilter["equals"];
+    if (from || to) where.timestamp = { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) };
 
     const [data, total] = await Promise.all([
       prisma.auditLog.findMany({
@@ -380,6 +381,62 @@ export const CarsService = {
       prisma.auditLog.count({ where }),
     ]);
 
-    return { data, total, page, pageSize };
+    // Rows written before `userEmail` existed only carry an opaque id — fall
+    // back to the live user record so the log never shows a bare uuid.
+    const missing = [...new Set(data.filter((r) => !r.userEmail).map((r) => r.userId))];
+    const fallback = new Map(
+      missing.length
+        ? (
+            await prisma.user.findMany({
+              where: { id: { in: missing } },
+              select: { id: true, email: true },
+            })
+          ).map((u) => [u.id, u.email])
+        : [],
+    );
+
+    // Car labels, so the UI can say "BMW X5 (2019)" instead of just #42.
+    const carIds = [...new Set(data.map((r) => r.carId).filter((v): v is number => v !== null))];
+    const cars = carIds.length
+      ? await prisma.car.findMany({
+          where: { id: { in: carIds } },
+          select: { id: true, brand: true, model: true, year: true },
+        })
+      : [];
+    const carById = new Map(cars.map((c) => [c.id, `${c.brand} ${c.model} (${c.year})`]));
+
+    return {
+      data: data.map((row) => ({
+        ...row,
+        userEmail: row.userEmail ?? fallback.get(row.userId) ?? null,
+        carLabel: row.carId !== null ? (carById.get(row.carId) ?? null) : null,
+      })),
+      total,
+      page,
+      pageSize,
+    };
+  },
+
+  // Distinct actors that appear in the log, for the UI's filter dropdown.
+  async getAuditActors() {
+    const rows = await prisma.auditLog.findMany({
+      distinct: ["userId"],
+      select: { userId: true, userEmail: true },
+      orderBy: { timestamp: "desc" },
+    });
+    const missing = rows.filter((r) => !r.userEmail).map((r) => r.userId);
+    const fallback = new Map(
+      missing.length
+        ? (
+            await prisma.user.findMany({
+              where: { id: { in: missing } },
+              select: { id: true, email: true },
+            })
+          ).map((u) => [u.id, u.email])
+        : [],
+    );
+    return rows
+      .map((r) => ({ userId: r.userId, email: r.userEmail ?? fallback.get(r.userId) ?? r.userId }))
+      .sort((a, b) => a.email.localeCompare(b.email));
   },
 };

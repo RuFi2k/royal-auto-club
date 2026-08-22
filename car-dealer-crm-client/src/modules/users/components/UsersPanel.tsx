@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "../../auth/AuthProvider";
 import {
   fetchPendingUsers, approveUser, rejectUser,
-  fetchApprovedUsers, disableUser, enableUser,
-  type PendingUser, type ApprovedUser,
+  fetchApprovedUsers, disableUser, enableUser, setUserRole,
+  type PendingUser, type ApprovedUser, type UserRole,
 } from "../services/users.api";
 
 interface Props {
@@ -14,6 +15,8 @@ function fmtDate(iso: string) {
 }
 
 export function UsersPanel({ onClose }: Props) {
+  const { user: currentUser } = useAuth();
+  const currentUid = currentUser?.id;
   const [pending, setPending] = useState<PendingUser[]>([]);
   const [approved, setApproved] = useState<ApprovedUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,7 +36,12 @@ export function UsersPanel({ onClose }: Props) {
       await approveUser(uid);
       const user = pending.find((u) => u.uid === uid);
       setPending((prev) => prev.filter((u) => u.uid !== uid));
-      if (user) setApproved((prev) => [...prev, { ...user, disabled: false, isAdmin: false }]);
+      if (user) {
+        setApproved((prev) => [
+          ...prev,
+          { ...user, disabled: false, role: "manager", isAdmin: false, roleLocked: false },
+        ]);
+      }
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -60,6 +68,23 @@ export function UsersPanel({ onClose }: Props) {
     try {
       await disableUser(uid);
       setApproved((prev) => prev.map((u) => u.uid === uid ? { ...u, disabled: true } : u));
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleRole(uid: string, role: UserRole) {
+    const verb = role === "admin"
+      ? "Надати цьому користувачу права адміністратора?"
+      : "Забрати права адміністратора у цього користувача?";
+    if (!window.confirm(verb)) return;
+    setBusy(uid);
+    setError(null);
+    try {
+      const updated = await setUserRole(uid, role);
+      setApproved((prev) => prev.map((u) => (u.uid === uid ? updated : u)));
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -135,9 +160,23 @@ export function UsersPanel({ onClose }: Props) {
                     {user.disabled && <span style={{ color: "#e53e3e", fontSize: 12 }}>Заблоковано</span>}
                   </div>
                   <div className="pending-user-actions">
-                    {user.isAdmin ? (
-                      <span style={{ fontSize: 12, color: "#718096" }}>Адмін</span>
-                    ) : user.disabled ? (
+                    <span className={`role-badge role-badge-${user.role}`}>
+                      {user.role === "admin" ? "Адмін" : "Менеджер"}
+                    </span>
+                    {user.roleLocked ? (
+                      <span style={{ fontSize: 11, color: "#a0aec0" }}>з env</span>
+                    ) : user.uid === currentUid ? (
+                      <span style={{ fontSize: 11, color: "#a0aec0" }}>це ви</span>
+                    ) : (
+                      <button
+                        className="action-btn"
+                        disabled={busy === user.uid}
+                        onClick={() => handleRole(user.uid, user.role === "admin" ? "manager" : "admin")}
+                      >
+                        {user.role === "admin" ? "→ Менеджер" : "→ Адмін"}
+                      </button>
+                    )}
+                    {!user.roleLocked && (user.disabled ? (
                       <button
                         className="action-btn action-available"
                         disabled={busy === user.uid}
@@ -153,7 +192,7 @@ export function UsersPanel({ onClose }: Props) {
                       >
                         Заблокувати
                       </button>
-                    )}
+                    ))}
                   </div>
                 </div>
               ))}

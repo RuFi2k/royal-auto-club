@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { bearer } from "better-auth/plugins";
 import { prisma } from "../db";
+import { recordAudit } from "./audit";
 
 const ADMIN_EMAILS = new Set(
   (process.env.ADMIN_EMAILS ?? "")
@@ -30,10 +31,12 @@ export const auth = betterAuth({
     autoSignIn: true,
   },
   user: {
-    // CRM approval workflow. `input: false` keeps clients from self-approving.
+    // CRM approval workflow. `input: false` keeps clients from self-approving
+    // or self-promoting to admin.
     additionalFields: {
       approved: { type: "boolean", defaultValue: false, input: false },
       disabled: { type: "boolean", defaultValue: false, input: false },
+      role: { type: "string", defaultValue: "manager", input: false },
     },
   },
   databaseHooks: {
@@ -41,9 +44,22 @@ export const auth = betterAuth({
       create: {
         before: async (user) => {
           // Admins (from ADMIN_EMAILS) are approved on creation; everyone else
-          // starts pending until an admin approves them.
-          const approved = isAdminEmail(user.email ?? "");
-          return { data: { ...user, approved } };
+          // starts pending as a manager until an admin approves them.
+          const admin = isAdminEmail(user.email ?? "");
+          return { data: { ...user, approved: admin, role: admin ? "admin" : "manager" } };
+        },
+      },
+    },
+    session: {
+      create: {
+        after: async (session) => {
+          const user = await prisma.user.findUnique({ where: { id: session.userId } });
+          void recordAudit({
+            userId: session.userId,
+            userEmail: user?.email ?? null,
+            action: "LOGIN",
+            changedFields: { ip: session.ipAddress ?? null },
+          });
         },
       },
     },

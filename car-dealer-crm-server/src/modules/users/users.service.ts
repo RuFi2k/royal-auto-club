@@ -14,9 +14,14 @@ export const UsersService = {
   },
 
   async getStatus(uid: string, _email: string, isAdmin: boolean) {
-    if (isAdmin) return { approved: true, isAdmin: true, disabled: false };
+    if (isAdmin) return { approved: true, isAdmin: true, role: "admin", disabled: false };
     const user = await prisma.user.findUnique({ where: { id: uid } });
-    return { approved: user?.approved ?? false, isAdmin: false, disabled: user?.disabled ?? false };
+    return {
+      approved: user?.approved ?? false,
+      isAdmin: false,
+      role: "manager",
+      disabled: user?.disabled ?? false,
+    };
   },
 
   async getPending() {
@@ -43,6 +48,10 @@ export const UsersService = {
 
   async enable(uid: string) {
     return prisma.user.update({ where: { id: uid }, data: { disabled: false } });
+  },
+
+  async setRole(uid: string, role: "admin" | "manager") {
+    return prisma.user.update({ where: { id: uid }, data: { role } });
   },
 
   async remove(uid: string) {

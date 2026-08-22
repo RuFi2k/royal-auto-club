@@ -185,11 +185,32 @@ enum AuditAction {
   UPDATE
   DELETE
   AVAILABILITY_CHANGE
+  PHOTO_ADD
+  PHOTO_DELETE
+  PHOTO_REORDER
+  TELEGRAM_PUBLISH
+  TELEGRAM_DELETE
+  AUTORIA_PUBLISH
+  AUTORIA_DELETE
+  USER_APPROVE
+  USER_DISABLE
+  USER_ENABLE
+  USER_DELETE
+  USER_ROLE_CHANGE
+  LOGIN
+  LOGOUT
+}
+
+// admin sees the event log and manages users; manager only operates the CRM.
+enum UserRole {
+  admin
+  manager
 }
 
 model AuditLog {
   id            Int         @id @default(autoincrement())
   userId        String
+  userEmail     String?     // denormalized: rows stay readable after user deletion
   action        AuditAction
   carId         Int?        // kept after deletion so history is readable
   changedFields Json?       // { field: { from, to } } for UPDATE; snapshot for CREATE/DELETE
@@ -212,6 +233,7 @@ model User {
   image         String?
   approved      Boolean   @default(false)
   disabled      Boolean   @default(false)
+  role          UserRole  @default(manager)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
