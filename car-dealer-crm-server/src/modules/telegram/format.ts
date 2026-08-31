@@ -51,12 +51,8 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function formatMileage(km: number): string {
-  if (km >= 1000) {
-    const thousands = Math.round(km / 1000);
-    return `${thousands.toLocaleString("uk-UA")} тис. км`;
-  }
-  return `${km.toLocaleString("uk-UA")} км`;
+function formatMileage(thousandsKm: number): string {
+  return `${thousandsKm.toLocaleString("uk-UA")} тис. км`;
 }
 
 export function formatPrice(price: unknown): string {
