@@ -63,10 +63,10 @@ function toPublicCar(car: CarWithPhotos) {
   return { ...rest, coverImage, gallery, photoUrl: coverImage?.url ?? null, options: optionIds };
 }
 
-type ListStatus = "upcoming" | "available" | "sold" | "all";
+type ListStatus = "upcoming" | "available" | "sold" | "unsold" | "all";
 function parseStatus(v: unknown): ListStatus {
   const s = str(v);
-  if (s === "upcoming" || s === "sold" || s === "all") return s;
+  if (s === "upcoming" || s === "sold" || s === "unsold" || s === "all") return s;
   return "available";
 }
 
@@ -97,6 +97,7 @@ publicRouter.get("/cars", a(async (req, res) => {
   const status = parseStatus(q.status);
   const where: Prisma.CarWhereInput = {};
 
+  if (status === "unsold") where.listingStatus = { in: ["available", "upcoming"] };
   if (status === "available") where.listingStatus = "available";
   if (status === "upcoming") where.listingStatus = "upcoming";
   if (status === "sold") {
