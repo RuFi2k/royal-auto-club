@@ -108,6 +108,12 @@ publicRouter.get("/cars", a(async (req, res) => {
   // status=all still excludes CRM-only and archived rows.
   if (status === "all") where.listingStatus = { notIn: ["draft", "archived"] };
 
+  const statuses = str(q.statuses)?.split(",").filter(
+    (value): value is "available" | "upcoming" | "sold" =>
+      value === "available" || value === "upcoming" || value === "sold",
+  );
+  if (statuses?.length) where.listingStatus = { in: statuses };
+
   const b = str(q.brand);
   if (b) where.brand = { contains: b, mode: "insensitive" };
   const m = str(q.model);
