@@ -63,10 +63,10 @@ function toPublicCar(car: CarWithPhotos) {
   return { ...rest, coverImage, gallery, photoUrl: coverImage?.url ?? null, options: optionIds };
 }
 
-type ListStatus = "upcoming" | "available" | "sold" | "all";
+type ListStatus = "upcoming" | "available" | "sold" | "unsold" | "all";
 function parseStatus(v: unknown): ListStatus {
   const s = str(v);
-  if (s === "upcoming" || s === "sold" || s === "all") return s;
+  if (s === "upcoming" || s === "sold" || s === "unsold" || s === "all") return s;
   return "available";
 }
 
@@ -97,6 +97,7 @@ publicRouter.get("/cars", a(async (req, res) => {
   const status = parseStatus(q.status);
   const where: Prisma.CarWhereInput = {};
 
+  if (status === "unsold") where.listingStatus = { in: ["available", "upcoming"] };
   if (status === "available") where.listingStatus = "available";
   if (status === "upcoming") where.listingStatus = "upcoming";
   if (status === "sold") {
@@ -106,6 +107,12 @@ publicRouter.get("/cars", a(async (req, res) => {
   }
   // status=all still excludes CRM-only and archived rows.
   if (status === "all") where.listingStatus = { notIn: ["draft", "archived"] };
+
+  const statuses = str(q.statuses)?.split(",").filter(
+    (value): value is "available" | "upcoming" | "sold" =>
+      value === "available" || value === "upcoming" || value === "sold",
+  );
+  if (statuses?.length) where.listingStatus = { in: statuses };
 
   const b = str(q.brand);
   if (b) where.brand = { contains: b, mode: "insensitive" };
